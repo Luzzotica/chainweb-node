@@ -5,6 +5,8 @@ import System.Environment
 import System.Exit
 import Text.Printf
 
+import Chainweb.Pact.Backend.Compaction
+
 import qualified CheckpointerDBChecksum
 import qualified Ea
 import qualified EncodeDecodeB64Util
@@ -87,6 +89,10 @@ topLevelCommands =
       "known-graphs"
       "Encode know graphs as JSON values"
       KnownGraphs.main
+  , CommandSpec
+      "compact"
+      "Compact pact database"
+      compactMain
   ]
 
 printHelp :: [CommandSpec] -> IO ()
