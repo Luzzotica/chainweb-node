@@ -43,18 +43,19 @@ import Pact.Types.Persistence
 
 -- internal chainweb modules
 
-import Chainweb.BlockHash
+import Chainweb.BlockHash ( BlockHash )
 import Chainweb.BlockHeader
 import Chainweb.BlockHeight
 import Chainweb.Mempool.Mempool (InsertError(..),TransactionHash)
 import Chainweb.Miner.Pact
+import Chainweb.Pact.Backend.DbCache
 import Chainweb.Payload
 import Chainweb.Transaction
 import Chainweb.Utils (T2, encodeToText)
 import Chainweb.Version
 
-
 -- | Externally-injected PactService properties.
+--
 data PactServiceConfig = PactServiceConfig
   { _pactReorgLimit :: !Natural
     -- ^ Maximum allowed reorg depth, implemented as a rewind limit in validate. New block
@@ -73,6 +74,8 @@ data PactServiceConfig = PactServiceConfig
     -- ^ the gas limit for new block creation, not for validation
   , _pactLogGas :: !Bool
     -- ^ whether to write transaction gas logs at INFO
+  , _pactModuleCacheLimit :: !DbCacheLimitBytes
+    -- ^ limit of the database module cache in bytes of corresponding row data
   } deriving (Eq,Show)
 
 data GasPurchaseFailure = GasPurchaseFailure TransactionHash PactError
@@ -83,6 +86,27 @@ instance Show GasPurchaseFailure where show = unpack . encodeToText
 
 gasPurchaseFailureHash :: GasPurchaseFailure -> TransactionHash
 gasPurchaseFailureHash (GasPurchaseFailure h _) = h
+
+-- | Used by /local to tag metadata validation failures
+--
+newtype MetadataValidationFailure
+    = MetadataValidationFailure Text
+    deriving stock (Eq, Show, Generic)
+    deriving newtype (NFData)
+
+-- | Used by /local to trigger user signature verification
+--
+data LocalSignatureVerification
+    = Verify
+    | NoVerify
+    deriving stock (Eq, Show, Generic)
+
+-- | Used by /local to trigger preflight simulation
+--
+data LocalPreflightSimulation
+    = PreflightSimulation
+    | LegacySimulation
+    deriving stock (Eq, Show, Generic)
 
 -- | Exceptions thrown by PactService components that
 -- are _not_ recorded in blockchain record.
@@ -169,7 +193,10 @@ instance Show ValidateBlockReq where show ValidateBlockReq{..} = show (_valBlock
 
 data LocalReq = LocalReq
     { _localRequest :: !ChainwebTransaction
-    , _localResultVar :: !(PactExMVar (CommandResult Hash))
+    , _localPreflight :: !(Maybe LocalPreflightSimulation)
+    , _localSigVerification :: !(Maybe LocalSignatureVerification)
+    , _localRewindDepth :: !(Maybe BlockHeight)
+    , _localResultVar :: !(PactExMVar (Either MetadataValidationFailure (CommandResult Hash)))
     }
 instance Show LocalReq where show LocalReq{..} = show _localRequest
 
