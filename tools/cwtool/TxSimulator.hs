@@ -45,10 +45,11 @@ data SimConfig = SimConfig
       -- ^ index in payload transactions list
     , scChain :: ChainId
     , scVersion :: ChainwebVersion
+    , scGasLog :: Bool
     }
 
 simulate :: SimConfig -> IO ()
-simulate (SimConfig dbDir parentBlockFile payloadFile txIdx cid ver) = do
+simulate (SimConfig dbDir parentBlockFile payloadFile txIdx cid ver gasLog) = do
   parent <- decodeFileStrictOrThrow parentBlockFile
   PayloadData txs md _ _ _ :: PayloadData <- decodeFileStrictOrThrow payloadFile
   let Transaction tx = txs V.! txIdx
@@ -79,20 +80,21 @@ simulate (SimConfig dbDir parentBlockFile payloadFile txIdx cid ver) = do
     cwLogger = genericLogger Debug T.putStrLn
     initGas cmd = initialGasOf (_cmdPayload cmd)
     logger = newLogger (pactLoggers cwLogger) "TxSimulator"
-    gasLogger = Nothing
+    gasLogger | gasLog = Just logger
+              | otherwise = Nothing
     txContext parent cmd = TxContext (ParentHeader parent) $ publicMetaOf cmd
 
 
 simulateMain :: IO ()
 simulateMain = do
-  execParser opts >>= \(d,h,p,i,c,v) -> do
+  execParser opts >>= \(d,h,p,i,c,v,g) -> do
     vv <- chainwebVersionFromText (T.pack v)
     cc <- chainIdFromText (T.pack c)
-    simulate $ SimConfig d h p i cc vv
+    simulate $ SimConfig d h p i cc vv g
   where
     opts = info (parser <**> helper)
         (fullDesc <> progDesc "Single Transaction simulator")
-    parser = (,,,,,)
+    parser = (,,,,,,)
         <$> strOption
              (short 'd'
               <> metavar "DBDIR"
@@ -118,3 +120,6 @@ simulateMain = do
               <> metavar "VERSION"
               <> help ("Chainweb version, default is "
                        ++ show Mainnet01))))
+        <*> switch
+             (short 'g'
+              <> help "Enable gas logging")
