@@ -61,6 +61,7 @@ import Pact.Types.SQLite
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
 import Chainweb.BlockHeight
+import Chainweb.ChainId
 import qualified Chainweb.Logger as C
 import Chainweb.Pact.Backend.ChainwebPactDb
 import Chainweb.Pact.Backend.Types
@@ -153,8 +154,8 @@ doRestore v cid dbenv (Just (bh, hash)) = runBlockEnv dbenv $ do
   where
     -- Module name fix follows the restore call to checkpointer.
     setModuleNameFix = bsModuleNameFix .= enableModuleNameFix v bh
-    setSortedKeys = bsSortedKeys .= pact420Upgrade v bh
-    setLowerCaseTables = bsLowerCaseTables .= chainweb217Pact After v bh
+    setSortedKeys = bsSortedKeys .= atOrAfterFork Pact420 v cid bh
+    setLowerCaseTables = bsLowerCaseTables .= afterFork Chainweb217Pact v cid bh
 doRestore _ _ dbenv Nothing = runBlockEnv dbenv $ do
     clearPendingTxState
     withSavepoint DbTransaction $

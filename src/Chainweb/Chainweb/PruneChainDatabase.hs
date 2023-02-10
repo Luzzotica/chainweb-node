@@ -99,6 +99,7 @@ import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import Data.Cuckoo
 import Data.Foldable
+import qualified Data.HashMap.Strict as HM
 
 import GHC.Generics
 
@@ -261,7 +262,7 @@ checkInductive now cdb False h = do
 --
 checkFull :: Time Micros -> WebBlockHeaderDb -> Bool -> BlockHeader -> IO ()
 checkFull _ _ True = const $ return ()
-checkFull now wdb False = void . validateBlockHeaderM now ctx
+checkFull now wdb False = void . validateBlockHeaderM (_chainwebVersion wdb) now ctx
   where
     ctx :: ChainValue BlockHash -> IO (Maybe BlockHeader)
     ctx cv = fmap _chainValueValue <$> tableLookup wdb cv

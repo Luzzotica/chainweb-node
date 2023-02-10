@@ -49,10 +49,10 @@ globalCurrentBackup :: TVar (Maybe Text)
 globalCurrentBackup = unsafePerformIO $! newTVarIO Nothing
 {-# NOINLINE globalCurrentBackup #-}
 
-someBackupApi :: ChainwebVersion -> SomeApi
+someBackupApi :: ChainwebVersionName -> SomeApi
 someBackupApi (FromSingChainwebVersion (SChainwebVersion :: Sing v)) = SomeApi $ backupApi @v
 
-someBackupServer :: Logger logger => ChainwebVersion -> Backup.BackupEnv logger -> SomeServer
+someBackupServer :: Logger logger => ChainwebVersionName -> Backup.BackupEnv logger -> SomeServer
 someBackupServer (FromSingChainwebVersion (SChainwebVersion :: Sing vT)) backupEnv =
     SomeServer (Proxy @(BackupApi vT)) $ makeBackup :<|> checkBackup
   where

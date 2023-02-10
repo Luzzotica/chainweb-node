@@ -52,7 +52,7 @@ import Chainweb.BlockHeaderDB.Internal (_chainDbCas, RankedBlockHeader(..))
 import Chainweb.Storage.Table
 import Chainweb.Storage.Table.RocksDB
 
-testVer :: ChainwebVersion
+testVer :: ChainwebVersion dc
 testVer = FastTimedCPM peterson
 
 cid :: ChainId
@@ -80,7 +80,7 @@ tests rdb =
         , after AllSucceed "reject-dupes" $
             let deepForkLimit = 4
             in withPactTestBlockDb testVer cid Quiet rdb mp (forkLimit deepForkLimit)
-                (testCaseSteps "deep-fork-limit" . testDeepForkLimit mpio (fromIntegral deepForkLimit))
+                (testCaseSteps "deep-fork-limit" . testDeepForkLimit testVer mpio (fromIntegral deepForkLimit))
         ]
   where
     genblock = genesisBlockHeader testVer cid
@@ -102,7 +102,7 @@ onRestart mpio iop step = do
     step $ "max block has height " <> sshow (_blockHeight block)
     let nonce = Nonce $ fromIntegral $ _blockHeight block
     step "mine block on top of max block"
-    T3 _ b _ <- mineBlock (ParentHeader block) nonce iop
+    T3 _ b _ <- mineBlock testVer (ParentHeader block) nonce iop
     assertEqual "Invalid BlockHeight" 1 (_blockHeight b)
 
 testMemPoolAccess :: MemPoolAccess
@@ -186,7 +186,7 @@ serviceInitializationAfterFork mpio genesisBlock iop = do
           go = do
               pblock <- gets ParentHeader
               n <- liftIO $ Nonce <$> readIORef ncounter
-              ret@(T3 _ newblock _) <- liftIO $ mineBlock pblock n iop
+              ret@(T3 _ newblock _) <- liftIO $ mineBlock testVer pblock n iop
               liftIO $ modifyIORef' ncounter succ
               put newblock
               return ret
@@ -225,7 +225,7 @@ firstPlayThrough mpio genesisBlock iop = do
           go = do
               pblock <- gets ParentHeader
               n <- liftIO $ Nonce <$> readIORef ncounter
-              ret@(T3 _ newblock _) <- liftIO $ mineBlock pblock n iop
+              ret@(T3 _ newblock _) <- liftIO $ mineBlock testVer pblock n iop
               liftIO $ modifyIORef' ncounter succ
               put newblock
               return ret
@@ -237,9 +237,9 @@ testDupes
   -> Assertion
 testDupes mpio genesisBlock iop = do
     setMempool mpio =<< dupegenMemPoolAccess
-    (T3 _ newblock payload) <- liftIO $ mineBlock (ParentHeader genesisBlock) (Nonce 1) iop
+    (T3 _ newblock payload) <- liftIO $ mineBlock testVer (ParentHeader genesisBlock) (Nonce 1) iop
     expectException newblock payload $ liftIO $
-        mineBlock (ParentHeader newblock) (Nonce 3) iop
+        mineBlock testVer (ParentHeader newblock) (Nonce 3) iop
   where
     expectException newblock payload act = do
         m <- wrap `catchAllSynchronous` h
@@ -262,12 +262,13 @@ testDupes mpio genesisBlock iop = do
         h _ = return Nothing
 
 testDeepForkLimit
-  :: IO (IORef MemPoolAccess)
+  :: ChainwebVersion
+  -> IO (IORef MemPoolAccess)
   -> Word64
   -> IO (PactQueue,TestBlockDb)
   -> (String -> IO ())
   -> Assertion
-testDeepForkLimit mpio deepForkLimit iop step = do
+testDeepForkLimit v mpio deepForkLimit iop step = do
     setOneShotMempool mpio testMemPoolAccess
     bdb <- snd <$> iop
     bhdb <- getBlockHeaderDb cid bdb
@@ -298,18 +299,19 @@ testDeepForkLimit mpio deepForkLimit iop step = do
               pblock <- gets ParentHeader
               n <- liftIO $ Nonce <$> readIORef ncounter
               liftIO $ step $ "mine block on top of height " <> sshow (_blockHeight $ _parentHeader pblock)
-              ret@(T3 _ newblock _) <- liftIO $ mineBlock pblock n iop
+              ret@(T3 _ newblock _) <- liftIO $ mineBlock v pblock n iop
               liftIO $ modifyIORef' ncounter succ
               put newblock
               return ret
 
 
 mineBlock
-    :: ParentHeader
+    :: ChainwebVersion
+    -> ParentHeader
     -> Nonce
     -> IO (PactQueue,TestBlockDb)
     -> IO (T3 ParentHeader BlockHeader PayloadWithOutputs)
-mineBlock ph nonce iop = timeout 5000000 go >>= \case
+mineBlock v ph nonce iop = timeout 5000000 go >>= \case
     Nothing -> error "PactReplay.mineBlock: Test timeout. Most likely a test case caused a pact service failure that wasn't caught, and the test was blocked while waiting for the result"
     Just x -> return x
   where
@@ -321,6 +323,7 @@ mineBlock ph nonce iop = timeout 5000000 go >>= \case
       payload <- assertNotLeft =<< takeMVar mv
 
       let bh = newBlockHeader
+               v
                mempty
                (_payloadWithOutputsPayloadHash payload)
                nonce

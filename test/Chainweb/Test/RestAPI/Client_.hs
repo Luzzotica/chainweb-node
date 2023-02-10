@@ -63,7 +63,7 @@ import Servant.Client_
 -- Payload API
 
 payloadGetClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ChainId
     -> BlockPayloadHash
     -> ClientM_ PayloadData
@@ -73,7 +73,7 @@ payloadGetClient' v c = runIdentity $ do
     return $ client_ @(PayloadGetApi v c)
 
 outputsGetClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ChainId
     -> BlockPayloadHash
     -> ClientM_ PayloadWithOutputs
@@ -86,7 +86,7 @@ outputsGetClient' v c = runIdentity $ do
 -- Cut API
 
 cutGetClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> Maybe MaxRank
     -> ClientM_ CutHashes
 cutGetClient' v = runIdentity $ do
@@ -94,7 +94,7 @@ cutGetClient' v = runIdentity $ do
     return $ client_ @(CutGetApi v)
 
 cutPutClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> CutHashes
     -> ClientM_ NoContent
 cutPutClient' v = runIdentity $ do
@@ -104,14 +104,14 @@ cutPutClient' v = runIdentity $ do
 -- -------------------------------------------------------------------------- --
 -- BlockHeaderDB API
 
-headerClient' :: ChainwebVersion -> ChainId -> BlockHash -> ClientM_ BlockHeader
+headerClient' :: ChainwebVersionTag -> ChainId -> BlockHash -> ClientM_ BlockHeader
 headerClient' v c = runIdentity $ do
     (SomeSing (SChainwebVersion :: Sing v)) <- return $ toSing v
     (SomeSing (SChainId :: Sing c)) <- return $ toSing c
     return $ client_ @(HeaderApi v c)
 
 headersClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)
@@ -124,7 +124,7 @@ headersClient' v c = runIdentity $ do
     return $ client_ @(HeadersApi v c)
 
 hashesClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)
@@ -137,7 +137,7 @@ hashesClient' v c = runIdentity $ do
     return $ client_ @(HashesApi v c)
 
 branchHashesClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)
@@ -151,7 +151,7 @@ branchHashesClient' v c = runIdentity $ do
     return $ client_ @(BranchHashesApi v c)
 
 branchHeadersClient'
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)

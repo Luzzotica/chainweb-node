@@ -65,7 +65,7 @@ pactSpvApiClient_
 pactSpvApiClient_ = client (pactSpvApi @v @c)
 
 pactSpvApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
         -- ^ the chain id of the source chain id used in the
         -- execution of a cross-chain-transfer.
@@ -92,7 +92,7 @@ ethSpvApiClient_
 ethSpvApiClient_ = client (ethSpvApi @v @c)
 
 ethSpvApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
         -- ^ chain to which the request is submitted. The resuting proof does
         -- not depend on the chain and can be validated on any chain.
@@ -119,7 +119,7 @@ pactSpv2ApiClient_
 pactSpv2ApiClient_ = client (pactSpv2Api @v @c)
 
 pactSpv2ApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
         -- ^ the chain id of the target chain of the proof.
     -> Spv2Request
@@ -141,7 +141,7 @@ pactLocalApiClient_
 pactLocalApiClient_ = client (pactLocalApi @v @c)
 
 pactLocalApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> Command T.Text
     -> ClientM (CommandResult Hash)
@@ -162,7 +162,7 @@ pactListenApiClient_
 pactListenApiClient_ = client (pactListenApi @v @c)
 
 pactListenApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> ListenerRequest
     -> ClientM ListenResponse
@@ -183,7 +183,7 @@ pactSendApiClient_
 pactSendApiClient_ = client (pactSendApi @v @c)
 
 pactSendApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> SubmitBatch
     -> ClientM RequestKeys
@@ -204,7 +204,7 @@ pactPollApiClient_
 pactPollApiClient_ = client (pactPollApi @v @c)
 
 pactPollApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> Poll
     -> ClientM PollResponses

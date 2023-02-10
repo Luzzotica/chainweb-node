@@ -66,10 +66,10 @@ import qualified Streaming.Prelude as S
 
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis (genesisBlockHeader)
 import Chainweb.BlockHeader.Validation
 import Chainweb.BlockHeight
 import Chainweb.ChainId
+import Chainweb.Graph
 import Chainweb.TreeDB
 import Chainweb.Utils hiding (Codec)
 import Chainweb.Utils.Paging
@@ -87,6 +87,7 @@ import Numeric.Additive
 data Configuration = Configuration
     { _configRoot :: !BlockHeader
     , _configRocksDb :: !RocksDb
+    , _configVersion :: !ChainwebVersion
     }
 
 -- -------------------------------------------------------------------------- --
@@ -259,7 +260,7 @@ initBlockHeaderDb config = do
         ["BlockHeader", cidNs, "rank"]
 
     !db = BlockHeaderDb cid
-        (_chainwebVersion rootEntry)
+        (_configVersion config)
         headerTable
         rankTable
 
@@ -279,6 +280,7 @@ withBlockHeaderDb db v cid = bracket start closeBlockHeaderDb
     start = initBlockHeaderDb Configuration
         { _configRoot = genesisBlockHeader v cid
         , _configRocksDb = db
+        , _configVersion = v
         }
 
 -- -------------------------------------------------------------------------- --
@@ -292,7 +294,7 @@ instance TreeDb BlockHeaderDb where
 
     lookup db h = runMaybeT $ do
         -- lookup rank
-        r <- MaybeT $ tableLookup (_chainDbRankTable db) h 
+        r <- MaybeT $ tableLookup (_chainDbRankTable db) h
         MaybeT $ lookupRanked db (int r) h
     {-# INLINEABLE lookup #-}
 
@@ -402,6 +404,6 @@ insertBlockHeaderDb db = dbAddChecked db . _validatedHeader
 {-# INLINE insertBlockHeaderDb #-}
 
 unsafeInsertBlockHeaderDb :: BlockHeaderDb -> BlockHeader -> IO ()
-unsafeInsertBlockHeaderDb = dbAddChecked 
+unsafeInsertBlockHeaderDb = dbAddChecked
 {-# INLINE unsafeInsertBlockHeaderDb #-}
 

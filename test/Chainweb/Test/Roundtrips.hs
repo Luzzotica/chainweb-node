@@ -224,6 +224,7 @@ jsonTestCases f =
     , testProperty "Seconds" $ f @Seconds
     , testProperty "Micros" $ f @Micros
     , testProperty "ChainId" $ f @ChainId
+    , testProperty "ChainwebVersion" $ f @ChainwebVersionTag
     , testProperty "ChainwebVersion" $ f @ChainwebVersion
     , testProperty "Nonce" $ f @Nonce
     , testProperty "HashDifficulty" $ f @HashDifficulty
@@ -429,8 +430,8 @@ base64RoundtripTests = testGroup "Base64 encoding roundtrips"
 
 hasTextRepresentationTests :: TestTree
 hasTextRepresentationTests = testGroup "HasTextRepresentation roundtrips"
-    [ testProperty "ChainwebVersion" $ prop_iso' @_ @ChainwebVersion fromText toText
-    , testProperty "ChainwebVersion" $ prop_iso' @_ @ChainwebVersion eitherFromText toText
+    [ testProperty "ChainwebVersion" $ prop_iso' @_ @ChainwebVersionTag fromText toText
+    , testProperty "ChainwebVersion" $ prop_iso' @_ @ChainwebVersionTag eitherFromText toText
     , testProperty "ChainId" $ prop_iso' @_ @ChainId fromText toText
     , testProperty "BlockHash" $ prop_iso' @_ @BlockHash fromText toText
     , testProperty "Seconds" $ prop_iso' @_ @Seconds fromText toText

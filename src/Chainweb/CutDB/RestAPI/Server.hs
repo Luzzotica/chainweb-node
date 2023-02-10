@@ -105,20 +105,20 @@ someCutServerT :: PeerDb -> SomeCutDb tbl -> SomeServer
 someCutServerT pdb (SomeCutDb (db :: CutDbT tbl v)) =
     SomeServer (Proxy @(CutApi v)) (cutServer pdb db)
 
-someCutServer :: ChainwebVersion -> PeerDb -> CutDb tbl -> SomeServer
+someCutServer :: ChainwebVersionName -> PeerDb -> CutDb tbl -> SomeServer
 someCutServer v pdb = someCutServerT pdb . someCutDbVal v
 
 someCutGetServerT :: SomeCutDb tbl -> SomeServer
 someCutGetServerT (SomeCutDb (db :: CutDbT tbl v)) =
     SomeServer (Proxy @(CutGetApi v)) (cutGetServer db)
 
-someCutGetServer :: ChainwebVersion -> CutDb tbl -> SomeServer
+someCutGetServer :: ChainwebVersionName -> CutDb tbl -> SomeServer
 someCutGetServer v = someCutGetServerT . someCutDbVal v
 
 -- -------------------------------------------------------------------------- --
 -- Run Server
 
-serveCutOnPort :: Port -> ChainwebVersion -> PeerDb -> CutDb tbl -> IO ()
+serveCutOnPort :: Port -> ChainwebVersionName -> PeerDb -> CutDb tbl -> IO ()
 serveCutOnPort p v pdb = run (int p) . someServerApplication . someCutServer v pdb
 
 

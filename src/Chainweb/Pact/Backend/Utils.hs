@@ -89,6 +89,7 @@ import Pact.Types.Util (AsString(..))
 
 -- chainweb
 
+import Chainweb.ChainId
 import Chainweb.Logger
 import Chainweb.Pact.Backend.SQLite.DirectV2
 import Chainweb.Pact.Backend.Types

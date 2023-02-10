@@ -135,12 +135,13 @@ import qualified Pact.Types.Hash as H
 
 import Chainweb.BlockHash
 import Chainweb.BlockHeight
+import Chainweb.ChainId
 import Chainweb.Time (Micros(..), Time(..), TimeSpan(..))
 import qualified Chainweb.Time as Time
 import Chainweb.Transaction
 import Chainweb.Utils
 import Chainweb.Utils.Serialization
-import Chainweb.Version (ChainwebVersion(..))
+import Chainweb.Version
 import Data.LogMessage (LogFunctionText)
 
 ------------------------------------------------------------------------------
@@ -359,9 +360,9 @@ noopMempool = do
 
 ------------------------------------------------------------------------------
 chainwebTransactionConfig
-    :: Maybe (ChainwebVersion, BlockHeight)
+    :: PactParserVersion
     -> TransactionConfig ChainwebTransaction
-chainwebTransactionConfig chainCtx = TransactionConfig (chainwebPayloadCodec chainCtx)
+chainwebTransactionConfig pactParserVersion = TransactionConfig (chainwebPayloadCodec pactParserVersion)
     commandHash
     chainwebTestHashMeta
     getGasPrice

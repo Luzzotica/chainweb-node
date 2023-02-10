@@ -46,7 +46,7 @@ import Chainweb.Utils.Bench
 import Chainweb.Utils (sshow)
 import Chainweb.Version
 
-v :: ChainwebVersion
+v :: ChainwebVersion dc
 v = FastTimedCPM petersonChainGraph
 
 bench :: C.Benchmark

@@ -102,6 +102,11 @@ module Chainweb.BlockHeader
 
 -- * Genesis BlockHeader
 , isGenesisBlockHeader
+, genesisParentBlockHash
+, genesisBlockHeader
+, genesisBlockHeadersAtHeight
+, genesisHeight
+, workSizeBytes
 
 -- * Create a new BlockHeader
 , newBlockHeader
@@ -111,6 +116,7 @@ module Chainweb.BlockHeader
 ) where
 
 import Control.DeepSeq
+import Control.Exception
 import Control.Lens hiding ((.=))
 import Control.Monad.Catch
 
@@ -119,13 +125,18 @@ import Data.Aeson.Types (Parser)
 import Data.Function (on)
 import Data.Hashable
 import qualified Data.HashMap.Strict as HM
+import Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as HS
+import Data.IORef
 import Data.Kind
 import qualified Data.Memory.Endian as BA
+import Data.MerkleLog hiding (Actual, Expected, MerkleHash)
 import qualified Data.Text as T
 import Data.Word
 
 import GHC.Generics (Generic)
+import GHC.Stack
+import Numeric.Natural
 
 -- Internal imports
 
@@ -146,11 +157,16 @@ import Chainweb.TreeDB (TreeDbEntry(..))
 import Chainweb.Utils
 import Chainweb.Utils.Serialization
 import Chainweb.Version
+import Chainweb.Version.Mainnet
+import Chainweb.Version.Registry
 
 import Chainweb.Storage.Table
 
+import Crypto.Hash.Algorithms
+
 import Numeric.AffineSpace
 
+import System.IO.Unsafe
 import Text.Read (readEither)
 
 -- -------------------------------------------------------------------------- --
@@ -216,13 +232,11 @@ decodeEpochStartTime = EpochStartTime <$> decodeTime
 -- early stages of the network.
 --
 effectiveWindow :: BlockHeader -> Maybe WindowWidth
-effectiveWindow h = WindowWidth <$> case window ver of
+effectiveWindow h = WindowWidth <$> case _versionWindow (_chainwebVersion h) of
     Nothing -> Nothing
     Just (WindowWidth w)
         | int (_blockHeight h) <= w -> Just $ max 1 $ w `div` 10
         | otherwise -> Just w
-  where
-    ver = _blockChainwebVersion h
 {-# INLINE effectiveWindow #-}
 
 -- | Return whether the given 'BlockHeader' is the last header in its epoch.
@@ -244,12 +258,12 @@ isLastInEpoch h = case effectiveWindow h of
 -- all chainweb version. Emergency DAs are enabled (and have occured) only on
 -- mainnet01 for cut heights smaller than 80,000.
 --
-slowEpoch :: ParentHeader -> BlockCreationTime -> Bool
-slowEpoch (ParentHeader p) (BlockCreationTime ct) = actual > (expected * 5)
+slowEpoch :: ChainwebVersion -> ParentHeader -> BlockCreationTime -> Bool
+slowEpoch v (ParentHeader p) (BlockCreationTime ct) = actual > (expected * 5)
   where
     EpochStartTime es = _blockEpochStart p
-    BlockRate s = blockRate (_blockChainwebVersion p)
-    WindowWidth ww = fromJuste $ window (_blockChainwebVersion p)
+    BlockRate s = _versionBlockRate v
+    WindowWidth ww = fromJuste $ _versionWindow v
 
     expected :: Seconds
     expected = s * int ww
@@ -282,24 +296,24 @@ powTarget p@(ParentHeader ph) as bct = case effectiveWindow ph of
     Nothing -> maxTarget
     Just w
         -- Emergency DA, legacy
-        | slowEpochGuard ver (_blockHeight ph) && slowEpoch p bct ->
+        | slowEpochGuard ver (_blockHeight ph) && slowEpoch ver p bct ->
             activeAdjust w
         | isLastInEpoch ph -> activeAdjust w
         | otherwise -> _blockTarget ph
   where
+    ver = _chainwebVersion ph
     t = EpochStartTime $ if oldTargetGuard ver (_blockHeight ph)
         then _bct bct
         else _bct (_blockCreationTime ph)
-    ver = _chainwebVersion p
 
     activeAdjust w
         | oldDaGuard ver (_blockHeight ph + 1)
-            = legacyAdjust ver w (t .-. _blockEpochStart ph) (_blockTarget ph)
+            = legacyAdjust (_versionBlockRate ver) w (t .-. _blockEpochStart ph) (_blockTarget ph)
         | otherwise
             = avgTarget $ adjustForParent w <$> (p : HM.elems as)
 
     adjustForParent w (ParentHeader a)
-        = adjust ver w (toEpochStart a .-. _blockEpochStart a) (_blockTarget a)
+        = adjust (_versionBlockRate ver) w (toEpochStart a .-. _blockEpochStart a) (_blockTarget a)
 
     toEpochStart = EpochStartTime . _bct . _blockCreationTime
 
@@ -330,7 +344,7 @@ epochStart ph@(ParentHeader p) adj (BlockCreationTime bt)
     -- A special case for starting a new devnet, to compensate the inaccurate
     -- creation time of the genesis blocks. This would result in a very long
     -- first epoch that cause a trivial target in the second epoch.
-    | ver == Development && _blockHeight p == 1 = EpochStartTime (_bct $ _blockCreationTime p)
+    | _versionFakeFirstEpochStart ver, _blockHeight p == 1 = EpochStartTime (_bct $ _blockCreationTime p)
 
     -- New Graph: the block time of the genesis block isn't accurate, we thus
     -- use the block time of the first block on the chain. Depending on where
@@ -468,6 +482,148 @@ instance HasChainGraph ParentHeader where
     _chainGraph = _chainGraph . _parentHeader
     {-# INLINE _chainGraph #-}
 
+
+isGenesisBlockHeader :: BlockHeader -> Bool
+isGenesisBlockHeader b =
+    _blockHeight b == genesisHeight (_chainwebVersion b) (_blockChainId b)
+{-# INLINE isGenesisBlockHeader #-}
+
+--
+-- | The genesis block hash includes the Chainweb version and the 'ChainId'
+-- within the Chainweb version.
+--
+-- It is the '_blockParent' of the genesis block
+--
+genesisParentBlockHash :: (HasChainId p, HasChainwebVersionCode v) => v -> p -> BlockHash
+genesisParentBlockHash v p = BlockHash $ MerkleLogHash
+    $ merkleRoot $ merkleTree @ChainwebMerkleHashAlgorithm
+        [ InputNode "CHAINWEB_GENESIS"
+        , encodeMerkleInputNode encodeChainwebVersionCode (_chainwebVersionCode v)
+        , encodeMerkleInputNode encodeChainId (_chainId p)
+        ]
+
+{-# noinline genesisBlockHeaderCache #-}
+genesisBlockHeaderCache :: IORef (HashMap ChainwebVersionCode (HashMap ChainId BlockHeader))
+genesisBlockHeaderCache = unsafePerformIO $ do
+    let mkMainnetHeader = makeGenesisBlockHeader mainnet
+    newIORef $ HM.singleton (_versionCode mainnet) $ HM.fromList
+        [ (cid, mkMainnetHeader cid)
+        | cid <- HS.toList (chainIds mainnet)
+        ]
+
+lookupGenesisBlockHeader :: ChainwebVersionCode -> ChainId -> Maybe BlockHeader
+lookupGenesisBlockHeader code cid = unsafePerformIO $ do
+    m <- readIORef genesisBlockHeaderCache
+    return $ fromJuste . HM.lookup cid <$> HM.lookup code m
+
+-- | A block chain is globally uniquely identified by its genesis hash.
+-- Internally, we use the 'ChainwebVersionTag value and the 'ChainId'
+-- as identifiers. We thus include the 'ChainwebVersionTag value and the
+-- 'ChainId' into the genesis block hash.
+--
+-- We assume that there is always only a single 'ChainwebVersionTag in
+-- scope and identify chains only by their internal 'ChainId'.
+--
+genesisBlockHeaders :: ChainwebVersion -> HashMap ChainId BlockHeader
+genesisBlockHeaders v = case HM.lookup (_versionCode v) headersByVersion of
+    Just hs -> hs
+    Nothing -> unsafeDupablePerformIO $ do
+        modifyIORef' genesisBlockHeaderCache $ HM.insert (_versionCode v) freshGenesisHeaders
+        return freshGenesisHeaders
+  where
+    headersByVersion = unsafeDupablePerformIO (readIORef genesisBlockHeaderCache)
+    freshGenesisHeaders =
+        flip HM.mapWithKey (HS.toMap (chainIds v)) $ \cid () ->
+            makeGenesisBlockHeader v cid
+
+genesisBlockHeader :: HasChainId p => ChainwebVersion -> p -> BlockHeader
+genesisBlockHeader v p = genesisBlockHeaders v ^?! at (_chainId p) . _Just
+
+makeGenesisBlockHeader :: ChainwebVersion -> ChainId -> BlockHeader
+makeGenesisBlockHeader v cid =
+    makeGenesisBlockHeader' v cid (_genesisTime (_versionGenesis v) ^?! onChain cid) (Nonce 0)
+
+-- | Like `genesisBlockHeader`, but with slightly more control.
+--
+-- This call generates the block header from the definitions in
+-- "Chainweb.Version". It is a somewhat expensive call, since it involves
+-- building the Merkle tree.
+--
+makeGenesisBlockHeader'
+    :: HasChainId p
+    => ChainwebVersion
+    -> p
+    -> BlockCreationTime
+    -> Nonce
+    -> BlockHeader
+makeGenesisBlockHeader' v p ct@(BlockCreationTime t) n =
+    fromLog @ChainwebMerkleHashAlgorithm mlog
+  where
+    g = genesisGraph v p
+    cid = _chainId p
+
+    mlog = newMerkleLog
+        $ mkFeatureFlags
+        :+: ct
+        :+: genesisParentBlockHash v cid
+        :+: (v ^?! versionGenesis . genesisBlockTarget . onChain cid)
+        :+: genesisBlockPayloadHash v cid
+        :+: cid
+        :+: BlockWeight 0
+        :+: genesisHeight v cid -- because of chain graph changes (new chains) not all chains start at 0
+        :+: _chainwebVersionCode v
+        :+: EpochStartTime t
+        :+: n
+        :+: MerkleLogBody (blockHashRecordToVector adjParents)
+    adjParents = BlockHashRecord $ HM.fromList $
+        (\c -> (c, genesisParentBlockHash v c)) <$> HS.toList (adjacentChainIds g p)
+
+-- | The set of genesis block headers as it exited at a particular block height
+--
+genesisBlockHeadersAtHeight
+    :: ChainwebVersion
+    -> BlockHeight
+    -> HashMap ChainId BlockHeader
+genesisBlockHeadersAtHeight v h =
+    HM.filter (\hdr -> _blockHeight hdr <= h) (genesisBlockHeaders v)
+--
+-- -------------------------------------------------------------------------- --
+-- Genesis Height
+--
+-- | The genesis graph for a given Chain
+--
+-- Invariant:
+--
+-- * The given ChainId exists in the first graph of the graph history.
+--   (We generally assume that this invariant holds throughout the code base.
+--   It is enforced via the 'mkChainId' smart constructor for ChainId.)
+--
+genesisGraph
+    :: HasCallStack
+    => HasChainwebVersion v
+    => HasChainId c
+    => v
+    -> c
+    -> ChainGraph
+genesisGraph v = chainGraphAt v_ . genesisHeight v_ . _chainId
+  where
+    v_ = _chainwebVersion v
+{-# INLINE genesisGraph #-}
+
+-- | Returns the height of the genesis block for a chain.
+--
+-- The implementation is somewhat expensive. With the current number of chains
+-- this isn't an issue. Otherwise the result should be hardcoded or memoized.
+--
+-- Invariant:
+--
+-- * The given ChainId exists in the first graph of the graph history.
+--   (We generally assume that this invariant holds throughout the code base.
+--   It is enforced via the 'mkChainId' smart constructor for ChainId.)
+--
+genesisHeight :: HasCallStack => ChainwebVersion -> ChainId -> BlockHeight
+genesisHeight v c = _blockHeight (genesisBlockHeader v c)
+
 -- -------------------------------------------------------------------------- --
 -- Block Header
 
@@ -575,11 +731,6 @@ data BlockHeader :: Type where
         deriving (Show, Generic)
         deriving anyclass (NFData)
 
-isGenesisBlockHeader :: BlockHeader -> Bool
-isGenesisBlockHeader b =
-    _blockHeight b == genesisHeight (_blockChainwebVersion b) (_blockChainId b)
-{-# INLINE isGenesisBlockHeader #-}
-
 instance Eq BlockHeader where
      (==) = (==) `on` _blockHash
      {-# INLINE (==) #-}
@@ -625,7 +776,7 @@ instance HasMerkleLog ChainwebMerkleHashAlgorithm ChainwebHashTag BlockHeader wh
         , ChainId
         , BlockWeight
         , BlockHeight
-        , ChainwebVersion
+        , ChainwebVersionCode
         , EpochStartTime
         , Nonce
         ]
@@ -643,7 +794,7 @@ instance HasMerkleLog ChainwebMerkleHashAlgorithm ChainwebHashTag BlockHeader wh
             :+: _blockChainId bh
             :+: _blockWeight bh
             :+: _blockHeight bh
-            :+: _blockChainwebVersion bh
+            :+: _versionCode (_blockChainwebVersion bh)
             :+: _blockEpochStart bh
             :+: _blockNonce bh
             :+: MerkleLogBody (blockHashRecordToVector $ _blockAdjacentHashes bh)
@@ -672,11 +823,12 @@ instance HasMerkleLog ChainwebMerkleHashAlgorithm ChainwebHashTag BlockHeader wh
             :+: cid
             :+: weight
             :+: height
-            :+: cwv
+            :+: cwvc
             :+: es
             :+: nonce
             :+: MerkleLogBody adjParents
             ) = _merkleLogEntries l
+        cwv = lookupVersion cwvc
 
         adjGraph
             | height == genesisHeight cwv cid = chainGraphAt cwv height
@@ -693,7 +845,7 @@ encodeBlockHeaderWithoutHash b = do
     encodeChainId (_blockChainId b)
     encodeBlockWeight (_blockWeight b)
     encodeBlockHeight (_blockHeight b)
-    encodeChainwebVersion (_blockChainwebVersion b)
+    encodeChainwebVersionCode (_versionCode $ _blockChainwebVersion b)
     encodeEpochStartTime (_blockEpochStart b)
     encodeNonce (_blockNonce b)
 
@@ -741,7 +893,7 @@ decodeBlockHeaderWithoutHash = do
     a6 <- decodeChainId
     a7 <- decodeBlockWeight
     a8 <- decodeBlockHeight
-    a9 <- decodeChainwebVersion
+    a9 <- decodeChainwebVersionCode
     a11 <- decodeEpochStartTime
     a12 <- decodeNonce
     return
@@ -773,7 +925,7 @@ decodeBlockHeader = BlockHeader
     <*> decodeChainId
     <*> decodeBlockWeight
     <*> decodeBlockHeight
-    <*> decodeChainwebVersion
+    <*> (lookupVersion <$> decodeChainwebVersionCode)
     <*> decodeEpochStartTime
     <*> decodeNonce
     <*> decodeBlockHash
@@ -817,7 +969,7 @@ computeBlockHash h = BlockHash $ MerkleLogHash $ computeMerkleLogRoot h
 -- the value of '_blockTarget' (interpreted as 'BlockHashNat').
 --
 _blockPow :: BlockHeader -> PowHash
-_blockPow h = powHash (_blockChainwebVersion h)
+_blockPow h = cryptoHash @Blake2s_256
     $ runPutS $ encodeBlockHeaderWithoutHash h
 
 blockPow :: Getter BlockHeader PowHash
@@ -864,7 +1016,7 @@ blockHeaderProperties (ObjectEncoded b) =
     , "chainId" .= _chainId b
     , "weight" .= _blockWeight b
     , "height" .= _blockHeight b
-    , "chainwebVersion" .= _blockChainwebVersion b
+    , "chainwebVersion" .= _versionCode (_blockChainwebVersion b)
     , "epochStart" .= _blockEpochStart b
     , "featureFlags" .= _blockFlags b
     , "hash" .= _blockHash b
@@ -888,7 +1040,7 @@ parseBlockHeaderObject o = BlockHeader
     <*> o .: "chainId"
     <*> o .: "weight"
     <*> o .: "height"
-    <*> o .: "chainwebVersion"
+    <*> (lookupVersion <$> o .: "chainwebVersion")
     <*> o .: "epochStart"
     <*> o .: "nonce"
     <*> o .: "hash"
@@ -932,7 +1084,8 @@ instance IsBlockHeader BlockHeader where
 -- but might be worth it!
 --
 newBlockHeader
-    :: HM.HashMap ChainId ParentHeader
+    :: ChainwebVersion
+    -> HM.HashMap ChainId ParentHeader
         -- ^ Adjacent parent hashes.
     -> BlockPayloadHash
         -- ^ payload hash
@@ -944,7 +1097,7 @@ newBlockHeader
     -> ParentHeader
         -- ^ parent block header
     -> BlockHeader
-newBlockHeader adj pay nonce t p@(ParentHeader b) =
+newBlockHeader ver adj pay nonce t p@(ParentHeader b) =
     fromLog @ChainwebMerkleHashAlgorithm $ newMerkleLog
         $ mkFeatureFlags
         :+: t
@@ -954,13 +1107,12 @@ newBlockHeader adj pay nonce t p@(ParentHeader b) =
         :+: cid
         :+: _blockWeight b + BlockWeight (targetToDifficulty target)
         :+: _blockHeight b + 1
-        :+: v
+        :+: _versionCode ver
         :+: epochStart p adj t
         :+: nonce
         :+: MerkleLogBody (blockHashRecordToVector adjHashes)
   where
     cid = _chainId p
-    v = _chainwebVersion p
     target = powTarget p adj t
     adjHashes = BlockHashRecord $ (_blockHash . _parentHeader) <$> adj
 
@@ -974,3 +1126,62 @@ instance TreeDbEntry BlockHeader where
     parent e
         | isGenesisBlockHeader e = Nothing
         | otherwise = Just (_blockParent e)
+
+
+
+-- | This is an internal function. Use 'headerSizeBytes' instead.
+--
+-- Postconditions: for all @v@
+--
+-- * @not . null $ headerSizes v@, and
+-- * @0 == (fst . last) (headerSizes v)@.
+--
+-- Note that for all but genesis headers the number of adjacent hashes depends
+-- on the graph of the parent.
+--
+headerSizes :: ChainwebVersion -> Rule BlockHeight Natural
+headerSizes v = fmap (\g -> _versionHeaderBaseSizeBytes v + 36 * degree g + 2) $ _versionGraphs v
+
+-- | The size of the serialized block header.
+--
+-- This function is safe because of the invariant of 'headerSize' that there
+-- exists and entry for block height 0.
+--
+-- Note that for all but genesis headers the number of adjacent hashes depends
+-- on the graph of the parent.
+--
+headerSizeBytes
+    :: HasCallStack
+    => ChainwebVersion
+    -> ChainId
+    -> BlockHeight
+    -> Natural
+headerSizeBytes v cid h = snd
+    $ ruleHead
+    $ ruleDropWhile (> relevantHeight)
+    $ headerSizes v
+  where
+    relevantHeight
+        | genesisHeight v cid == h = h
+        | otherwise = h - 1
+{-# INLINE headerSizeBytes #-}
+
+-- | The size of the work bytes /without/ the preamble of the chain id and target
+--
+-- The chain graph, and therefore also the header size, is constant for all
+-- blocks at the same height except for genesis blocks. Because genesis blocks
+-- are never mined, we can ignore this difference here and just return the
+-- result for chain 0.
+--
+-- NOTE: For production versions we require that the value is constant for a
+-- given chainweb version. This would only ever change as part of the
+-- introduction of new block header format.
+--
+workSizeBytes
+    :: HasCallStack
+    => ChainwebVersion
+    -> BlockHeight
+    -> Natural
+workSizeBytes v h = headerSizeBytes v (unsafeChainId 0) h - 32
+{-# INLINE workSizeBytes #-}
+

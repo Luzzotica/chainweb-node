@@ -93,7 +93,7 @@ instance Show GChainId where
 -- | Genesis transaction record
 --
 data Genesis = Genesis
-  { _version :: ChainwebVersion
+  { _version :: ChainwebVersionTag
     -- ^ chainweb version (e.g. Testnet04)
   , _tag :: Text
     -- ^ Module name tag
@@ -165,7 +165,7 @@ fungibleXChainV1 = "pact/coin-contract/v4/load-fungible-xchain-v1.yaml"
 
 development0 :: Genesis
 development0 = Genesis
-    { _version = Development
+    { _version = Development ()
     , _tag = "Development"
     , _txChainId = Zero
     , _coinbase = Just dev0Grants
@@ -181,7 +181,7 @@ developmentN = development0
 
 developmentKAD :: Genesis
 developmentKAD = Genesis
-    { _version = Development
+    { _version = Development ()
     , _tag = "Development"
     , _txChainId = KAD
     , _coinbase = Just devnetKadOps

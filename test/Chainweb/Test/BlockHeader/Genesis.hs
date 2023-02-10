@@ -27,13 +27,12 @@ import Test.Tasty.QuickCheck (testProperty, testProperties)
 
 import Chainweb.BlockHash (encodeBlockHash)
 import Chainweb.BlockHeader (BlockHeader(..))
-import Chainweb.BlockHeader.Genesis
-import Chainweb.ChainId (ChainId, unsafeChainId)
+import Chainweb.BlockHeader
 import Chainweb.Difficulty
 import Chainweb.Test.Utils (golden)
 import Chainweb.Utils
 import Chainweb.Utils.Serialization
-import Chainweb.Version (ChainwebVersion(..))
+import Chainweb.Version
 
 ---
 
@@ -42,7 +41,7 @@ import Chainweb.Version (ChainwebVersion(..))
 tests :: TestTree
 tests = testGroup "Chainweb.Test.BlockHeader.Genesis" $
     [ testGroup "genesis header golden tests" $ blockHash <$>
-        [ Development
+        [ Development ()
         , Testnet04
         , Mainnet01
         ]
@@ -56,7 +55,7 @@ blockHashes =
     hash :: BlockHeader -> BB.Builder
     hash = BB.byteString . B64U.encode . runPutS . encodeBlockHash . _blockHash
 
-blockHash :: ChainwebVersion -> TestTree
+blockHash :: ChainwebVersionTag -> TestTree
 blockHash v = golden (sshow v <> "-block-hashes") $
     pure $ blockHashes $ genesisBlockHeaders v
 
@@ -89,7 +88,7 @@ graphTransitionTargetTests = testGroup "graph transition genesis targets"
     , testProperty "cross check testnet20InitialHashTarget and mainnet20InitialHashTarget" $
         _hashTarget testnet20InitialHashTarget `div` _hashTarget mainnet20InitialHashTarget === PowHashNat 8893
     , testProperty "cross check development and testnet20InitialHashTarget" $
-        _hashTarget (genesisBlockTarget Development (unsafeChainId 10)) `div` _hashTarget testnet20InitialHashTarget === PowHashNat 20321
+        _hashTarget (genesisBlockTarget (Development ()) (unsafeChainId 10)) `div` _hashTarget testnet20InitialHashTarget === PowHashNat 20321
     ]
 
   where

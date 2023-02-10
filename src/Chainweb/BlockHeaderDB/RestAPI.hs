@@ -172,7 +172,7 @@ data SomeBlockHeaderDb = forall v c
     => SomeBlockHeaderDb (BlockHeaderDb_ v c)
 
 someBlockHeaderDbVal :: ChainwebVersion -> ChainId -> BlockHeaderDb -> SomeBlockHeaderDb
-someBlockHeaderDbVal v cid db = case someChainwebVersionVal v of
+someBlockHeaderDbVal v cid db = case someChainwebVersionVal (_versionName v) of
      (SomeChainwebVersionT (Proxy :: Proxy vt)) -> case someChainIdVal cid of
          (SomeChainIdT (Proxy :: Proxy cidt)) -> SomeBlockHeaderDb (BlockHeaderDb_ @vt @cidt db)
 
@@ -342,13 +342,13 @@ blockHeaderDbApi = Proxy
 -- Multi Chain API
 
 -- TODO Just use @case@ statements.
-someBlockHeaderDbApi :: ChainwebVersion -> ChainId -> SomeApi
+someBlockHeaderDbApi :: ChainwebVersionName -> ChainId -> SomeApi
 someBlockHeaderDbApi v c = runIdentity $ do
     SomeChainwebVersionT (_ :: Proxy v') <- return $ someChainwebVersionVal v
     SomeChainIdT (_ :: Proxy c') <- return $ someChainIdVal c
     return $ SomeApi (blockHeaderDbApi @v' @c')
 
-someBlockHeaderDbApis :: ChainwebVersion -> [ChainId] -> SomeApi
+someBlockHeaderDbApis :: ChainwebVersionName -> [ChainId] -> SomeApi
 someBlockHeaderDbApis v = mconcat . fmap (someBlockHeaderDbApi v)
 
 -- -------------------------------------------------------------------------- --
@@ -394,5 +394,5 @@ type HeaderStreamApi (v :: ChainwebVersionT) = 'ChainwebEndpoint v :> HeaderStre
 headerStreamApi :: forall (v :: ChainwebVersionT). Proxy (HeaderStreamApi v)
 headerStreamApi = Proxy
 
-someHeaderStreamApi :: ChainwebVersion -> SomeApi
+someHeaderStreamApi :: ChainwebVersionName -> SomeApi
 someHeaderStreamApi (FromSingChainwebVersion (SChainwebVersion :: Sing v)) = SomeApi $ headerStreamApi @v

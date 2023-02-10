@@ -46,6 +46,7 @@ import Pact.Types.Persistence
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
 import Chainweb.BlockHeight
+import Chainweb.ChainId
 import Chainweb.Mempool.Mempool (InsertError(..),TransactionHash)
 import Chainweb.Miner.Pact
 import Chainweb.Pact.Backend.DbCache

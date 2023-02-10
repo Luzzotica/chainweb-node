@@ -55,7 +55,7 @@ import Chainweb.WebBlockHeaderDB
 
 import Chainweb.Storage.Table.RocksDB
 
-testVer :: ChainwebVersion
+testVer :: ChainwebVersion dc
 testVer = FastTimedCPM singleton
 
 testChainId :: ChainId
@@ -278,7 +278,7 @@ withPact' bdbio ioSqlEnv r (ps, cacheTest) = do
     bhdb <- getWebBlockHeaderDb (_bdbWebBlockHeaderDb bdb) testChainId
     let pdb = _bdbPayloadDb bdb
     sqlEnv <- ioSqlEnv
-    T2 _ pstate <- runPactService'
+    T2 _ pstate <- withPactService
         testVer testChainId logger bhdb pdb sqlEnv defaultPactServiceConfig ps
     cacheTest r (_psInitCache pstate)
   where

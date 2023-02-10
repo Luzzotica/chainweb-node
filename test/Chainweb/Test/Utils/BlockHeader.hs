@@ -118,7 +118,7 @@ testBlockPayload_ b = testPayload $ B8.intercalate ","
 testGetNewAdjacentParentHeaders
     :: HasCallStack
     => Applicative m
-    => ChainwebVersion
+    => ChainwebVersionTag
     -> (ChainValue BlockHash -> m BlockHeader)
     -> BlockHashRecord
     -> m (HM.HashMap ChainId (Either BlockHash ParentHeader))
@@ -129,7 +129,8 @@ testGetNewAdjacentParentHeaders v hdb = itraverse select . _getBlockHashRecord
         | otherwise = Right . ParentHeader <$> hdb (ChainValue cid h)
 
 testBlockHeader
-    :: HM.HashMap ChainId ParentHeader
+    :: ChainwebVersion
+    -> HM.HashMap ChainId ParentHeader
         -- ^ Adjacent parent hashes
     -> Nonce
         -- ^ Randomness to affect the block hash. It is also included into
@@ -137,8 +138,8 @@ testBlockHeader
     -> ParentHeader
         -- ^ parent block header
     -> BlockHeader
-testBlockHeader adj nonce p@(ParentHeader b) =
-    newBlockHeader adj payload nonce (BlockCreationTime $ add second t) p
+testBlockHeader v adj nonce p@(ParentHeader b) =
+    newBlockHeader v adj payload nonce (BlockCreationTime $ add second t) p
   where
     payload = _payloadWithOutputsPayloadHash $ testBlockPayloadFromParent_ nonce p
     BlockCreationTime t = _blockCreationTime b
@@ -148,17 +149,17 @@ testBlockHeader adj nonce p@(ParentHeader b) =
 --
 -- Should only be used for testing purposes.
 --
-testBlockHeaders :: ParentHeader -> [BlockHeader]
-testBlockHeaders (ParentHeader p) = L.unfoldr (Just . (id &&& id) . f) p
+testBlockHeaders :: ChainwebVersion -> ParentHeader -> [BlockHeader]
+testBlockHeaders v (ParentHeader p) = L.unfoldr (Just . (id &&& id) . f) p
   where
-    f b = testBlockHeader mempty (_blockNonce b) $ ParentHeader b
+    f b = testBlockHeader v mempty (_blockNonce b) $ ParentHeader b
 
 -- | Given a `BlockHeader` of some initial parent, generate an infinite stream
 -- of `BlockHeader`s which form a legal chain.
 --
 -- Should only be used for testing purposes.
 --
-testBlockHeadersWithNonce :: Nonce -> ParentHeader -> [BlockHeader]
-testBlockHeadersWithNonce n (ParentHeader p) = L.unfoldr (Just . (id &&& id) . f) p
+testBlockHeadersWithNonce :: ChainwebVersion -> Nonce -> ParentHeader -> [BlockHeader]
+testBlockHeadersWithNonce v n (ParentHeader p) = L.unfoldr (Just . (id &&& id) . f) p
   where
-    f b = testBlockHeader mempty n $ ParentHeader b
+    f b = testBlockHeader v mempty n $ ParentHeader b

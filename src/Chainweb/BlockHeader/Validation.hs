@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- Module: Chainweb.BlockHeader.Validation
@@ -111,10 +112,10 @@ import System.IO.Unsafe
 import Chainweb.BlockCreationTime
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis (genesisBlockTarget, genesisParentBlockHash, genesisBlockHeader)
 import Chainweb.ChainId
 import Chainweb.ChainValue
 import Chainweb.Difficulty
+import Chainweb.Graph (HasChainGraph(..), checkAdjacentChainIds)
 import Chainweb.Time
 import Chainweb.Utils
 import Chainweb.Version
@@ -444,13 +445,14 @@ isEphemeral failures
 --
 validateBlockHeaderM
     :: MonadThrow m
-    => Time Micros
+    => ChainwebVersion
+    -> Time Micros
         -- ^ The current clock time
     -> (ChainValue BlockHash -> m (Maybe BlockHeader))
         -- ^ Context of Validated BlockHeaders
     -> BlockHeader
     -> m ValidatedHeader
-validateBlockHeaderM t lookupHeader h =
+validateBlockHeaderM v t lookupHeader h =
     validateAllParentsExist lookupHeader h >>= \case
         Left e -> throwM $ ValidationFailure
             { _validateFailureParent = Nothing
@@ -459,7 +461,7 @@ validateBlockHeaderM t lookupHeader h =
             , _validationFailureFailures = [e]
             }
         Right ws -> do
-            let failures = validateBlockHeader t ws
+            let failures = validateBlockHeader v t ws
             unless (null failures) $ throwM $ webStepFailure ws failures
             return $ ValidatedHeader h
 
@@ -472,14 +474,15 @@ validateBlockHeaderM t lookupHeader h =
 --
 validateBlockHeadersM
     :: MonadThrow m
-    => Time Micros
+    => ChainwebVersion
+    -> Time Micros
         -- ^ The current clock time
     -> (ChainValue BlockHash -> m (Maybe BlockHeader))
         -- ^ Context of Validated BlockHeaders
     -> HM.HashMap BlockHash BlockHeader
     -> m ValidatedHeaders
-validateBlockHeadersM t lookupHeader as = do
-    traverse_ (validateBlockHeaderM t lookupHeader') as
+validateBlockHeadersM v t lookupHeader as = do
+    traverse_ (validateBlockHeaderM v t lookupHeader') as
     return $ ValidatedHeaders as
   where
     lookupHeader' h = case HM.lookup (_chainValueValue h) as of
@@ -587,11 +590,12 @@ validateAllParentsExist lookupParent h = runExceptT $ WebStep
 -- * IncorrectPayloadHash
 --
 isValidBlockHeader
-    :: Time Micros
+    :: ChainwebVersion
+    -> Time Micros
         -- ^ The current clock time
     -> WebStep
     -> Bool
-isValidBlockHeader t p = null $ validateBlockHeader t p
+isValidBlockHeader v t p = null $ validateBlockHeader v t p
 
 -- | Validate properties of the block header, producing a list of the validation
 -- failures.
@@ -603,14 +607,15 @@ isValidBlockHeader t p = null $ validateBlockHeader t p
 -- * IncorrectPayloadHash
 --
 validateBlockHeader
-    :: Time Micros
+    :: ChainwebVersion
+    -> Time Micros
         -- ^ The current clock time
     -> WebStep
     -> [ValidationFailureType]
         -- ^ A list of ways in which the block header isn't valid
-validateBlockHeader t p
+validateBlockHeader v t p
     = validateIntrinsic t (_webStepHeader p)
-    <> validateInductive p
+    <> validateInductive v p
 
 -- -------------------------------------------------------------------------- --
 -- Collections of Validation Properties
@@ -638,12 +643,13 @@ validateIntrinsic t b = concat
 -- | Validate properties of a block with respect to a given parent.
 --
 validateInductive
-    :: WebStep
+    :: ChainwebVersion
+    -> WebStep
     -> [ValidationFailureType]
         -- ^ A list of ways in which the block header isn't valid
-validateInductive ps
+validateInductive v ps
     = validateInductiveChainStep (_webStepChain ps)
-    <> validateInductiveWebStep ps
+    <> validateInductiveWebStep v ps
 
 validateInductiveChainStep
     :: ChainStep
@@ -658,13 +664,14 @@ validateInductiveChainStep s = concat
     ]
 
 validateInductiveWebStep
-    :: WebStep
+    :: ChainwebVersion
+    -> WebStep
         -- ^ parent block header. The genesis header is considered its own parent.
     -> [ValidationFailureType]
         -- ^ A list of ways in which the block header isn't valid
-validateInductiveWebStep s = concat
+validateInductiveWebStep v s = concat
     [ [ IncorrectEpoch | not (prop_block_epoch s) ]
-    , [ IncorrectTarget | not (prop_block_target s) ]
+    , [ IncorrectTarget | not (prop_block_target v s) ]
     , [ CreatedBeforeParent | not (prop_block_creationTime s) ]
     , [ AdjacentParentChainMismatch | not (prop_block_adjacent_parents s) ]
     , [ InvalidBraiding | not (prop_block_braiding s) ]
@@ -675,17 +682,17 @@ validateInductiveWebStep s = concat
 -- Intrinsic BlockHeader properties
 -- -------------------------------------------------------------------------- --
 
-powDisabled :: Bool
-powDisabled = case unsafeDupablePerformIO $ lookupEnv "DISABLE_POW_VALIDATION" of
-  Nothing -> False
-  Just{} -> True
-{-# NOINLINE powDisabled #-}
+-- powDisabled :: Bool
+-- powDisabled = case unsafeDupablePerformIO $ lookupEnv "DISABLE_POW_VALIDATION" of
+--   Nothing -> False
+--   Just{} -> True
+-- {-# NOINLINE powDisabled #-}
 
 prop_block_pow :: BlockHeader -> Bool
 prop_block_pow b
     | isGenesisBlockHeader b = True
         -- Genesis block headers are not mined. So there's not need for POW
-    | _blockChainwebVersion b == Development && powDisabled = True
+    | not (_versionUsePow (_chainwebVersion b)) = True
     | otherwise = checkTarget (_blockTarget b) (_blockPow b)
 
 prop_block_hash :: BlockHeader -> Bool
@@ -701,7 +708,7 @@ prop_block_genesis_parent b
 
 prop_block_genesis_target :: BlockHeader -> Bool
 prop_block_genesis_target b = isGenesisBlockHeader b
-    ==> _blockTarget b == genesisBlockTarget (_chainwebVersion b) (_chainId b)
+    ==> _blockTarget b == _chainwebVersion b ^?! versionGenesis . genesisBlockTarget . onChain (_chainId b)
 
 prop_block_current :: Time Micros -> BlockHeader -> Bool
 prop_block_current t b = BlockCreationTime t >= _blockCreationTime b
@@ -755,8 +762,8 @@ prop_block_chainId (ChainStep (ParentHeader p) b)
 -- -------------------------------------------------------------------------- --
 -- Multi chain inductive properties
 
-prop_block_target :: WebStep -> Bool
-prop_block_target (WebStep as (ChainStep p b))
+prop_block_target :: ChainwebVersion -> WebStep -> Bool
+prop_block_target ver (WebStep as (ChainStep p b))
     = _blockTarget b == powTarget p as (_blockCreationTime b)
 
 prop_block_epoch :: WebStep -> Bool

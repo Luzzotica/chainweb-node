@@ -5,8 +5,11 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- Module: Chainweb.Chainweb.Configuration
@@ -101,6 +104,7 @@ import System.Directory
 -- internal modules
 
 import Chainweb.BlockHeight
+import Chainweb.ChainId
 import Chainweb.HostAddress
 import qualified Chainweb.Mempool.Mempool as Mempool
 import Chainweb.Mempool.P2pConfig
@@ -408,8 +412,8 @@ validateChainwebConfiguration c = do
     validateMinerConfig (_configMining c)
     validateBackupConfig (_configBackup c)
     case _configChainwebVersion c of
-        Mainnet01 -> validateP2pConfiguration (_configP2p c)
-        Testnet04 -> validateP2pConfiguration (_configP2p c)
+        -- Mainnet01 -> validateP2pConfiguration (_configP2p c)
+        -- Testnet04 -> validateP2pConfiguration (_configP2p c)
         _ -> return ()
 
 validateBackupConfig :: ConfigValidation BackupConfig []
@@ -472,7 +476,8 @@ instance ToJSON ChainwebConfiguration where
 
 instance FromJSON ChainwebConfiguration where
     parseJSON = withObject "ChainwebConfiguration" $ \o -> do
-        v <- o .: "chainwebVersion" .!= Mainnet01
+        -- v <- o .: "chainwebVersion" .!= Mainnet01
+        v <- undefined
         ($ defaultChainwebConfiguration v) <$> parseJSON (Object o)
 
 instance FromJSON (ChainwebConfiguration -> ChainwebConfiguration) where
@@ -501,10 +506,7 @@ instance FromJSON (ChainwebConfiguration -> ChainwebConfiguration) where
 
 pChainwebConfiguration :: MParser ChainwebConfiguration
 pChainwebConfiguration = id
-    <$< configChainwebVersion .:: textOption
-        % long "chainweb-version"
-        <> short 'v'
-        <> help "the chainweb version that this node is using"
+    <$< configChainwebVersion %:: version
     <*< configHeaderStream .:: boolOption_
         % long "header-stream"
         <> help "whether to enable an endpoint for streaming block updates"
@@ -555,4 +557,25 @@ pChainwebConfiguration = id
         % long "module-cache-limit"
         <> help "Maximum size of the per-chain checkpointer module cache in bytes"
         <> metavar "INT"
+    where
+    version = constructVersion
+        <$> ((\new _old -> new & versionConfig .~ defaultDevVersionConfig)
+          <$> textOption @ChainwebVersionName
+              % long "chainweb-version"
+              <> short 'v'
+              <> help "the chainweb version that this node is using" <|> pure id)
+        <*> optional (textOption @Fork (long "fork-upper-bound" <> help "(development mode only) the latest fork the node will enable"))
+        <*> optional (BlockRate <$> textOption (long "block-rate" <> help "(development mode only) the block rate in seconds per block"))
+        where
+          constructVersion k br fub v
+            | notNullOf versionConfig v' =
+              v' & versionConfig %~
+                ( maybe id (versionBlockRate .~) fub
+                . maybe id (versionForkUpperBound ?~) br)
+            | Nothing <- br, Nothing <- fub = v'
+            | otherwise = error
+              $ "Specifying block-rate or fork-upper-bound is only legal with chainweb-version "
+              <> "set to development, but version is set to " <> show v'
+            where
+            v' = k v
 

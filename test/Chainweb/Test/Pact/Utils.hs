@@ -198,7 +198,7 @@ import Chainweb.Test.Utils.BlockHeader
 import Chainweb.Time
 import Chainweb.Transaction
 import Chainweb.Utils
-import Chainweb.Version (ChainwebVersion(..), chainIds)
+import Chainweb.Version
 import qualified Chainweb.Version as Version
 import Chainweb.Version.Utils (someChainId)
 import Chainweb.WebBlockHeaderDB
@@ -475,7 +475,7 @@ data CmdBuilder = CmdBuilder
   { _cbSigners :: ![CmdSigner]
   , _cbRPC :: !(PactRPC Text)
   , _cbNonce :: !Text
-  , _cbNetworkId :: !(Maybe ChainwebVersion)
+  , _cbNetworkId :: !(Maybe ChainwebVersionTag)
   , _cbChainId :: !ChainId
   , _cbSender :: !Text
   , _cbGasLimit :: !GasLimit
@@ -802,7 +802,7 @@ withBlockHeaderDb iordb b = withResource start stop
   where
     start = do
         rdb <- testRocksDb "withBlockHeaderDb" =<< iordb
-        testBlockHeaderDb rdb b
+        testBlockHeaderDb rdb someTestVersion b
     stop = closeBlockHeaderDb
 
 withTemporaryDir :: (IO FilePath -> TestTree) -> TestTree
@@ -868,7 +868,7 @@ epochCreationTime = BlockCreationTime epoch
 someBlockHeader :: ChainwebVersion -> BlockHeight -> BlockHeader
 someBlockHeader v 0 = genesisBlockHeader v (unsafeChainId 0)
 someBlockHeader v h = (!! (int h - 1))
-    $ testBlockHeaders
+    $ testBlockHeaders v
     $ ParentHeader
     $ genesisBlockHeader v (unsafeChainId 0)
 

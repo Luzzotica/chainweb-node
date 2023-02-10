@@ -178,8 +178,27 @@ instance Arbitrary Utf8Encoded where
 -- -------------------------------------------------------------------------- --
 -- Basics
 
--- FIXME: This doesn't throw pattern-match warnings when a new `ChainwebVersion`
+-- FIXME: This doesn't throw pattern-match warnings when a new `ChainwebVersionTag`
 -- constructor is invented!
+instance Arbitrary ChainwebVersionTag where
+    arbitrary = elements
+        [ Test singletonChainGraph
+        , Test petersonChainGraph
+        , TimedConsensus singletonChainGraph singletonChainGraph
+        , TimedConsensus petersonChainGraph petersonChainGraph
+        , TimedConsensus singletonChainGraph pairChainGraph
+        , TimedConsensus petersonChainGraph twentyChainGraph
+        , PowConsensus singletonChainGraph
+        , PowConsensus petersonChainGraph
+        , TimedCPM singletonChainGraph
+        , TimedCPM petersonChainGraph
+        , FastTimedCPM singletonChainGraph
+        , FastTimedCPM petersonChainGraph
+        , Development ()
+        , Testnet04
+        , Mainnet01
+        ]
+
 instance Arbitrary ChainwebVersion where
     arbitrary = elements
         [ Test singletonChainGraph
@@ -194,7 +213,7 @@ instance Arbitrary ChainwebVersion where
         , TimedCPM petersonChainGraph
         , FastTimedCPM singletonChainGraph
         , FastTimedCPM petersonChainGraph
-        , Development
+        , Development defaultDevVersionConfig
         , Testnet04
         , Mainnet01
         ]
@@ -372,7 +391,7 @@ arbitraryBlockHeaderVersionHeightChain v h cid
         $ liftA2 (:+:) (pure cid) -- chain id
         $ liftA2 (:+:) arbitrary -- weight
         $ liftA2 (:+:) (pure h) -- height
-        $ liftA2 (:+:) (pure v) -- version
+        $ liftA2 (:+:) (pure (chainwebVersionTag v)) -- version
         $ liftA2 (:+:) (EpochStartTime <$> chooseEnum (toEnum 0, t)) -- epoch start
         $ liftA2 (:+:) (Nonce <$> chooseAny) -- nonce
         $ fmap (MerkleLogBody . blockHashRecordToVector)

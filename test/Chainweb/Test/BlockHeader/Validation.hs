@@ -70,7 +70,7 @@ tests = testGroup "Chainweb.Test.Blockheader.Validation"
     , testProperty "validate arbitrary test header" prop_validateArbitrary
     , testProperty "validate arbitrary test header for mainnet" $ prop_validateArbitrary Mainnet01
     , testProperty "validate arbitrary test header for testnet" $ prop_validateArbitrary Testnet04
-    , testProperty "validate arbitrary test header for devnet" $ prop_validateArbitrary Development
+    , testProperty "validate arbitrary test header for devnet" $ prop_validateArbitrary (Development defaultDevVersionConfig)
     ]
 
 -- -------------------------------------------------------------------------- --
@@ -79,7 +79,7 @@ tests = testGroup "Chainweb.Test.Blockheader.Validation"
 -- There is an input for which the rule fails.
 --
 
-prop_featureFlag :: ChainwebVersion -> BlockHeight -> TestTree
+prop_featureFlag :: ChainwebVersionTag -> BlockHeight -> TestTree
 prop_featureFlag v h = testCase ("Invalid feature flags fail validation for " <> sshow v) $ do
     hdr <- (blockHeight .~ h)
         . (blockFlags .~ fromJuste (decode "1"))
@@ -111,19 +111,19 @@ prop_featureFlag v h = testCase ("Invalid feature flags fail validation for " <>
 -- * New minded blocks
 
 prop_validateMainnet :: TestTree
-prop_validateMainnet = prop_validateHeaders "validate Mainnet01 BlockHeaders" mainnet01Headers
+prop_validateMainnet = prop_validateHeaders Mainnet01 "validate Mainnet01 BlockHeaders" mainnet01Headers
 
 prop_validateTestnet04 :: TestTree
-prop_validateTestnet04 = prop_validateHeaders "validate Testnet04 BlockHeaders" testnet04Headers
+prop_validateTestnet04 = prop_validateHeaders Testnet04 "validate Testnet04 BlockHeaders" testnet04Headers
 
-prop_validateHeaders :: String -> [TestHeader] -> TestTree
-prop_validateHeaders msg hdrs = testGroup msg $ do
-    [ prop_validateHeader ("header " <> show @Int i) h | h <- hdrs | i <- [0..] ]
+prop_validateHeaders :: ChainwebVersion -> String -> [TestHeader] -> TestTree
+prop_validateHeaders v msg hdrs = testGroup msg $ do
+    [ prop_validateHeader v ("header " <> show @Int i) h | h <- hdrs | i <- [0..] ]
 
-prop_validateHeader :: String -> TestHeader -> TestTree
-prop_validateHeader msg h = testCase msg $ do
+prop_validateHeader :: ChainwebVersion -> String -> TestHeader -> TestTree
+prop_validateHeader v msg h = testCase msg $ do
     now <- getCurrentTimeIntegral
-    case validateBlockHeaderM now (testHeaderChainLookup h) (_testHeaderHdr h) of
+    case validateBlockHeaderM v now (testHeaderChainLookup h) (_testHeaderHdr h) of
         Right _ -> return ()
         Left errs -> assertFailure $ "Validation failed for BlockHeader: " <> sshow errs
 
@@ -139,21 +139,21 @@ prop_validateHeader msg h = testCase msg $ do
 --
 
 prop_fail_validate :: TestTree
-prop_fail_validate = validate_cases "validate invalid BlockHeaders" validationFailures
+prop_fail_validate = validate_cases Mainnet01 "validate invalid BlockHeaders" validationFailures
 
 prop_da_validate :: TestTree
-prop_da_validate = validate_cases "difficulty adjustment validation" daValidation
+prop_da_validate = validate_cases (Development defaultDevVersionConfig) "difficulty adjustment validation" daValidation
 
 prop_legacy_da_validate :: TestTree
-prop_legacy_da_validate = validate_cases "legacy difficulty adjustment validation" legacyDaValidation
+prop_legacy_da_validate = validate_cases Mainnet01 "legacy difficulty adjustment validation" legacyDaValidation
 
-validate_cases :: String -> [(TestHeader, [ValidationFailureType])] -> TestTree
-validate_cases msg testCases = testCase msg $ do
+validate_cases :: ChainwebVersion -> String -> [(TestHeader, [ValidationFailureType])] -> TestTree
+validate_cases v msg testCases = testCase msg $ do
     now <- getCurrentTimeIntegral
     traverse_ (f now) $ zip [0 :: Int ..] testCases
   where
     f now (i, (h, expectedErrs))
-        = try (validateBlockHeaderM now (testHeaderChainLookup h) (_testHeaderHdr h)) >>= \case
+        = try (validateBlockHeaderM v now (testHeaderChainLookup h) (_testHeaderHdr h)) >>= \case
             Right _
                 | null expectedErrs -> return ()
                 | otherwise -> assertFailure $ "Validation of test case " <> sshow i <> " succeeded unexpectedly for validationFailures BlockHeader"
@@ -182,16 +182,16 @@ validate_cases msg testCases = testCase msg $ do
 prop_validateArbitrary :: ChainwebVersion -> Property
 prop_validateArbitrary v =
     forAll (elements $ toList $ chainIds v) $ \cid ->
-        forAll (arbitraryTestHeader v cid) validateTestHeader
+        forAll (arbitraryTestHeader v cid) (validateTestHeader v)
 
-validateTestHeader :: TestHeader -> Property
-validateTestHeader h = case try val of
+validateTestHeader :: ChainwebVersion -> TestHeader -> Property
+validateTestHeader v h = case try val of
     Right (Left ValidationFailure{ _validationFailureFailures = errs }) -> verify errs
     Right _ -> property True
     Left err -> throw err
   where
     now = add second $ _bct $ _blockCreationTime $ _testHeaderHdr h
-    val = validateBlockHeaderM now (testHeaderChainLookup h) (_testHeaderHdr h)
+    val = validateBlockHeaderM v now (testHeaderChainLookup h) (_testHeaderHdr h)
     verify :: [ValidationFailureType] -> Property
     verify es = L.delete IncorrectPow es === []
 
@@ -234,7 +234,7 @@ validationFailures =
     , ( hdr & testHeaderHdr . blockChainId .~ unsafeChainId 1
       , [IncorrectHash, IncorrectPow, ChainMismatch, AdjacentChainMismatch]
       )
-    , ( hdr & testHeaderHdr . blockChainwebVersion .~ Development
+    , ( hdr & testHeaderHdr . blockChainwebVersion .~ Development ()
       , [IncorrectHash, IncorrectPow, VersionMismatch, InvalidFeatureFlags, CreatedBeforeParent, AdjacentChainMismatch, InvalidAdjacentVersion]
       )
     , ( hdr & testHeaderHdr . blockWeight .~ 10
@@ -269,7 +269,7 @@ validationFailures =
     , ( hdr & testHeaderHdr . blockAdjacentHashes .~ BlockHashRecord mempty
       , [IncorrectHash, IncorrectPow, AdjacentChainMismatch]
       )
-    , ( hdr & testHeaderAdjs . each . parentHeader . blockChainwebVersion .~ Development
+    , ( hdr & testHeaderAdjs . each . parentHeader . blockChainwebVersion .~ Development ()
       , [InvalidAdjacentVersion]
       )
     , ( hdr & testHeaderAdjs . ix 0 . parentHeader . blockChainId .~ unsafeChainId 0
@@ -351,19 +351,19 @@ daValidation =
     expected = [IncorrectHash, IncorrectPow, AdjacentChainMismatch]
 
     -- From mainnet
-    hdr = set (h . blockChainwebVersion) Development
+    hdr = set (h . blockChainwebVersion) (Development ())
         $ set (h . blockFlags) mkFeatureFlags
         $ set (h . blockHeight) 600000
         $ set (h . blockEpochStart) (EpochStartTime (hour ^+. epoch))
         $ set (h . blockTarget) ((view (p . blockTarget) hdr'))
         $ set (h . blockCreationTime) (BlockCreationTime (scaleTimeSpan @Int 2 hour ^+. epoch))
 
-        $ set (p . blockChainwebVersion) Development
+        $ set (p . blockChainwebVersion) (Development ())
         $ set (p . blockCreationTime) (BlockCreationTime (hour ^+. epoch))
         $ set (p . blockEpochStart) (EpochStartTime epoch)
         $ set (p . blockHeight) 599999
 
-        $ set (a . blockChainwebVersion) Development
+        $ set (a . blockChainwebVersion) (Development ())
         $ set (a . blockCreationTime) (BlockCreationTime (hour ^+. epoch))
         $ set (a . blockTarget) (view (p . blockTarget) hdr')
         $ set (a . blockEpochStart) (EpochStartTime epoch)

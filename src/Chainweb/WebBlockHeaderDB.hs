@@ -56,7 +56,6 @@ import qualified Streaming.Prelude as S
 import Chainweb.BlockHeight
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis (genesisBlockHeader)
 import Chainweb.BlockHeader.Validation
 import Chainweb.BlockHeaderDB
 import Chainweb.BlockHeaderDB.Internal
@@ -127,7 +126,7 @@ initWebBlockHeaderDb
     -> ChainwebVersion
     -> IO WebBlockHeaderDb
 initWebBlockHeaderDb db v = WebBlockHeaderDb
-    <$!> itraverse (\cid _ -> initBlockHeaderDb (conf cid db)) (HS.toMap $ chainIds v)
+    <$!> itraverse (\cid _ -> initBlockHeaderDb (conf cid db v)) (HS.toMap $ chainIds v)
     <*> pure v
   where
     conf cid = Configuration (genesisBlockHeader v cid)
@@ -209,7 +208,7 @@ insertWebBlockHeaderDb
     -> IO ()
 insertWebBlockHeaderDb wdb h = do
     t <- getCurrentTimeIntegral
-    valHdr <- validateBlockHeaderM t (chainLookup wdb) h
+    valHdr <- validateBlockHeaderM (_chainwebVersion wdb) t (chainLookup wdb) h
     insertWebBlockHeaderDbValidated wdb valHdr
 
 insertWebBlockHeaderDbManyValidated
@@ -233,7 +232,7 @@ insertWebBlockHeaderDbMany
     -> IO ()
 insertWebBlockHeaderDbMany db es = do
     t <- getCurrentTimeIntegral
-    valHdrs <- validateBlockHeadersM t (chainLookup db)
+    valHdrs <- validateBlockHeadersM (_chainwebVersion db) t (chainLookup db)
         $ HM.fromList $ (key &&& id) <$!> toList es
     insertWebBlockHeaderDbManyValidated db valHdrs
 

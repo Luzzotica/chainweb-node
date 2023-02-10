@@ -84,5 +84,5 @@ cutApi = Proxy
 -- -------------------------------------------------------------------------- --
 -- Some Cut Api
 
-someCutApi :: ChainwebVersion -> SomeApi
+someCutApi :: ChainwebVersionName -> SomeApi
 someCutApi (FromSingChainwebVersion (SChainwebVersion :: Sing v)) = SomeApi $ cutApi @v

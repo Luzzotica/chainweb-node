@@ -51,6 +51,7 @@ import System.Random
 
 -- internal modules
 
+import Chainweb.ChainId
 import Chainweb.Cut (Cut)
 import Chainweb.Cut.Create
 import Chainweb.CutDB (awaitNewCutByChainIdStm, _cut)
@@ -184,6 +185,6 @@ miningServer
     -> Server (MiningApi v)
 miningServer mr = workHandler mr :<|> solvedHandler mr :<|> updatesHandler mr
 
-someMiningServer :: Logger l => ChainwebVersion -> MiningCoordination l tbl -> SomeServer
+someMiningServer :: Logger l => ChainwebVersionName -> MiningCoordination l tbl -> SomeServer
 someMiningServer (FromSingChainwebVersion (SChainwebVersion :: Sing vT)) mr =
     SomeServer (Proxy @(MiningApi vT)) $ miningServer mr

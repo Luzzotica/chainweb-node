@@ -27,6 +27,7 @@ import Servant.API
 
 -- internal modules
 
+import Chainweb.ChainId (ChainId)
 import Chainweb.Miner.Core (ChainBytes, HeaderBytes, WorkBytes)
 import Chainweb.Miner.Pact (Miner)
 import Chainweb.RestAPI.Utils (ChainwebEndpoint(..), Reassoc, SomeApi(..))
@@ -59,5 +60,5 @@ type MiningApi (v :: ChainwebVersionT) = 'ChainwebEndpoint v :> Reassoc MiningAp
 miningApi :: forall (v :: ChainwebVersionT). Proxy (MiningApi v)
 miningApi = Proxy
 
-someMiningApi :: ChainwebVersion -> SomeApi
+someMiningApi :: ChainwebVersionName -> SomeApi
 someMiningApi (FromSingChainwebVersion (SChainwebVersion :: Sing v)) = SomeApi $ miningApi @v

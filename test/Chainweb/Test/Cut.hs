@@ -206,7 +206,7 @@ testMine'
     -> Cut
     -> IO (Either MineFailure (T2 BlockHeader Cut))
 testMine' wdb n t payloadHash i c =
-    try (createNewCut (chainLookupM wdb) n (t c (_chainId i)) payloadHash i c) >>= \case
+    try (createNewCut (_chainwebVersion wdb) (chainLookupM wdb) n (t c (_chainId i)) payloadHash i c) >>= \case
         Right p@(T2 h _) -> Right p <$ insertWebBlockHeaderDb wdb h
         e -> return e
 
@@ -214,15 +214,16 @@ testMineWithPayloadHash
     :: forall cid hdb
     . HasChainId cid
     => ChainValueCasLookup hdb BlockHeader
-    => hdb
+    => ChainwebVersion
+    -> hdb
     -> Nonce
     -> Time Micros
     -> BlockPayloadHash
     -> cid
     -> Cut
     -> IO (Either MineFailure (T2 BlockHeader Cut))
-testMineWithPayloadHash db n t ph cid c = try
-    $ createNewCut (chainLookupM db) n t ph cid c
+testMineWithPayloadHash v db n t ph cid c = try
+    $ createNewCut v (chainLookupM db) n t ph cid c
 
 -- | Create a new block. Only produces a new cut but doesn't insert it into the
 -- chain database.
@@ -233,16 +234,17 @@ createNewCut
     :: HasCallStack
     => MonadCatch m
     => HasChainId cid
-    => (ChainValue BlockHash -> m BlockHeader)
+    => ChainwebVersion
+    -> (ChainValue BlockHash -> m BlockHeader)
     -> Nonce
     -> Time Micros
     -> BlockPayloadHash
     -> cid
     -> Cut
     -> m (T2 BlockHeader Cut)
-createNewCut hdb n t pay i c = do
+createNewCut v hdb n t pay i c = do
     extension <- fromMaybeM BadAdjacents $ getCutExtension c i
-    work <- newWorkHeaderPure hdb (BlockCreationTime t) extension pay
+    work <- newWorkHeaderPure v hdb (BlockCreationTime t) extension pay
     (h, mc') <- extendCut c pay (solveWork work n t)
         `catch` \(InvalidSolvedHeader _ msg) -> throwM $ InvalidHeader msg
     c' <- fromMaybeM BadAdjacents mc'
@@ -256,14 +258,15 @@ createNewCut1Second
     . HasCallStack
     => MonadCatch m
     => HasChainId cid
-    => (ChainValue BlockHash -> m BlockHeader)
+    => ChainwebVersion
+    -> (ChainValue BlockHash -> m BlockHeader)
     -> Nonce
     -> BlockPayloadHash
     -> cid
     -> Cut
     -> m (T2 BlockHeader Cut)
-createNewCut1Second db n p i c
-    = createNewCut db n (offsetBlockTime Time.second c (_chainId i)) p i c
+createNewCut1Second v db n p i c
+    = createNewCut v db n (offsetBlockTime Time.second c (_chainId i)) p i c
 
 -- -------------------------------------------------------------------------- --
 -- Arbitrary Cuts
@@ -297,7 +300,7 @@ arbitraryCut v = T.sized $ \s -> do
         n <- Nonce <$> T.arbitrary
         let pay = _payloadWithOutputsPayloadHash $ testPayload
                 $ B8.intercalate "," [ sshow v, sshow cid, "TEST PAYLOAD"]
-        case try (createNewCut1Second (testLookup db) n pay cid c) of
+        case try (createNewCut1Second v (testLookup db) n pay cid c) of
             Left e -> throw e
             Right (Left BadAdjacents) -> return Nothing
             Right (Left e) -> throw e

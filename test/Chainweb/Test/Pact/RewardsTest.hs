@@ -17,7 +17,7 @@ import Chainweb.Test.Utils
 import Chainweb.Version
 
 
-v :: ChainwebVersion
+v :: ChainwebVersion dc
 v = FastTimedCPM petersonChainGraph
 
 tests :: ScheduledTest

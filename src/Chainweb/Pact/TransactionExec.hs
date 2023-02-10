@@ -98,11 +98,12 @@ import Pact.Types.SPV
 
 import Chainweb.BlockHeader
 import Chainweb.BlockHeight
+import qualified Chainweb.ChainId as Chainweb
 import Chainweb.Mempool.Mempool (requestKeyToTransactionHash)
 import Chainweb.Miner.Pact
 import Chainweb.Pact.Service.Types
 import Chainweb.Pact.Templates
-import Chainweb.Pact.Transactions.UpgradeTransactions
+-- import Chainweb.Pact.Transactions.UpgradeTransactions
 import Chainweb.Pact.Types hiding (logError)
 import Chainweb.Transaction
 import Chainweb.Utils (encodeToByteString, sshow, tryAllSynchronous, T2(..))
@@ -192,8 +193,8 @@ applyCmd v logger gasLogger pdbenv miner gasModel txCtx spv cmd initialGas mcach
     isModuleNameFix = enableModuleNameFix v currHeight
     isModuleNameFix2 = enableModuleNameFix2 v currHeight
     isPactBackCompatV16 = pactBackCompat_v16 v currHeight
-    chainweb213Pact' = chainweb213Pact (ctxVersion txCtx) (ctxCurrentBlockHeight txCtx)
-    chainweb217Pact' = chainweb217Pact After (ctxVersion txCtx) (ctxCurrentBlockHeight txCtx)
+    chainweb213Pact' = atOrAfterFork Chainweb213Pact (ctxVersion txCtx) (ctxChainId txCtx) (ctxCurrentBlockHeight txCtx)
+    chainweb217Pact' = afterFork Chainweb217Pact (ctxVersion txCtx) (ctxChainId txCtx) (ctxCurrentBlockHeight txCtx)
     toEmptyPactError (PactError errty _ _ _) = PactError errty def [] mempty
 
     toOldListErr pe = pe { peDoc = listErrMsg }
@@ -331,7 +332,7 @@ applyCoinbase v logger dbEnv (Miner mid mks@(MinerKeys mk)) reward@(ParsedDecima
     let interp = initStateInterpreter initState
     go interp cexec
   where
-    chainweb213Pact' = chainweb213Pact v bh
+    chainweb213Pact' = atOrAfterFork Chainweb213Pact v cid bh
     fork1_3InEffect = vuln797Fix v cid bh
     throwCritical = fork1_3InEffect || enfCBFailure
     ec = mkExecutionConfig $
@@ -353,7 +354,7 @@ applyCoinbase v logger dbEnv (Miner mid mks@(MinerKeys mk)) reward@(ParsedDecima
     parent = _tcParentHeader txCtx
 
     bh = ctxCurrentBlockHeight txCtx
-    cid = V._chainId parent
+    cid = Chainweb._chainId parent
     chash = Pact.Hash $ SB.toShort $ encodeToByteString $ _blockHash $ _parentHeader parent
         -- NOTE: it holds that @ _pdPrevBlockHash pd == encode _blockHash@
         -- NOTE: chash includes the /quoted/ text of the parent header.
@@ -458,13 +459,15 @@ readInitModules logger dbEnv txCtx
     -- guarding chainweb 2.17 here to allow for
     -- cache purging everything but coin and its
     -- dependencies.
-    chainweb217Pact' = chainweb217Pact
-      After
+    chainweb217Pact' = afterFork
+      Chainweb217Pact
       (ctxVersion txCtx)
+      (ctxChainId txCtx)
       (ctxCurrentBlockHeight txCtx)
 
     parent = _tcParentHeader txCtx
-    v = _chainwebVersion parent
+    v = ctxVersion txCtx
+    cid = ctxChainId txCtx
     h = _blockHeight (_parentHeader parent) + 1
     rk = RequestKey chash
     nid = Nothing
@@ -474,7 +477,7 @@ readInitModules logger dbEnv txCtx
     txst = TransactionState mempty mempty 0 Nothing (_geGasModel freeGasEnv)
     interp = defaultInterpreter
     die msg = throwM $ PactInternalError $ "readInitModules: " <> msg
-    mkCmd = buildExecParsedCode (Just (v, h)) Nothing
+    mkCmd = buildExecParsedCode (pactParserVersion v cid h) Nothing
     run msg cmd = do
       er <- catchesPactError $!
         applyExec' 0 interp cmd [] chash permissiveNamespacePolicy
@@ -537,33 +540,38 @@ readInitModules logger dbEnv txCtx
 --
 applyUpgrades
   :: ChainwebVersion
-  -> V.ChainId
+  -> Chainweb.ChainId
   -> BlockHeight
   -> TransactionM p (Maybe ModuleCache)
 applyUpgrades v cid height
-     | coinV2Upgrade v cid height = applyCoinV2
-     | pact4coin3Upgrade At v height = applyCoinV3
-     | chainweb214Pact At v height = applyCoinV4
-     | chainweb215Pact At v height = applyCoinV5
-     | chainweb217Pact At v height = filterModuleCache
+     | atFork CoinV2 v cid height = applyCoinV2
+     | atFork Pact4Coin3 v cid height = applyCoinV3
+     | atFork Chainweb214Pact v cid height = applyCoinV4
+     | atFork Chainweb215Pact v cid height = applyCoinV5
+     | atFork Chainweb217Pact v cid height = filterModuleCache
      | otherwise = return Nothing
   where
     installCoinModuleAdmin = set (evalCapabilities . capModuleAdmin) $ S.singleton (ModuleName "coin" Nothing)
 
-    applyCoinV2 = applyTxs (upgradeTransactions v cid) [FlagDisableInlineMemCheck, FlagDisablePact43, FlagDisablePact45]
+    applyCoinV2 = applyTxs (v ^?! versionUpgradeTransactions . coinV2Transactions . onChain cid)
+        [FlagDisableInlineMemCheck, FlagDisablePact43, FlagDisablePact45]
 
-    applyCoinV3 = applyTxs coinV3Transactions [FlagDisableInlineMemCheck, FlagDisablePact43, FlagDisablePact45]
+    applyCoinV3 = applyTxs (v ^?! versionUpgradeTransactions . coinV3Transactions . onChain cid)
+        [FlagDisableInlineMemCheck, FlagDisablePact43, FlagDisablePact45]
 
-    applyCoinV4 = applyTxs coinV4Transactions [FlagDisablePact45]
-    applyCoinV5 = applyTxs coinV5Transactions [FlagDisablePact45]
+    applyCoinV4 = applyTxs (v ^?! versionUpgradeTransactions . coinV4Transactions . onChain cid)
+        [FlagDisablePact45]
+
+    applyCoinV5 = applyTxs (v ^?! versionUpgradeTransactions . coinV5Transactions . onChain cid)
+        [FlagDisablePact45]
 
     filterModuleCache = do
       mc <- use txCache
       pure $ Just $ HM.filterWithKey (\k _ -> k == "coin") mc
 
-    applyTxs txsIO flags = do
+    applyTxs txs flags = do
       infoLog "Applying upgrade!"
-      txs <- map (fmap payloadObj) <$> liftIO txsIO
+      let payloads = map (fmap payloadObj) $ txs
 
       --
       -- In order to prime the module cache with all new modules for subsequent
@@ -572,7 +580,7 @@ applyUpgrades v cid height
       -- init cache in the pact service state (_psInitCache).
       --
       let execConfig = mkExecutionConfig flags
-      caches <- local (set txExecutionConfig execConfig) $ mapM applyTx txs
+      caches <- local (set txExecutionConfig execConfig) $ mapM applyTx payloads
       return $ Just (HM.unions caches)
 
     interp = initStateInterpreter
@@ -590,12 +598,12 @@ applyUpgrades v cid height
 
 applyTwentyChainUpgrade
     :: ChainwebVersion
-    -> V.ChainId
+    -> Chainweb.ChainId
     -> BlockHeight
     -> TransactionM p ()
 applyTwentyChainUpgrade v cid bh
-    | to20ChainRebalance v cid bh = do
-      txlist <- liftIO $ twentyChainUpgradeTransactions v cid
+    | atFork To20Chains v cid bh = do
+      let txlist = v ^?! versionUpgradeTransactions . to20ChainTransactions . onChain cid
 
       infoLog $ "Applying 20-chain upgrades on chain " <> sshow cid
 
@@ -746,40 +754,39 @@ enforceKeysetFormats' tc
     | enforceKeysetFormats (ctxVersion tc) (ctxCurrentBlockHeight tc) = [FlagEnforceKeyFormats]
     | otherwise = []
 
-
 enablePact40 :: TxContext -> [ExecutionFlag]
 enablePact40 tc
-    | pact4coin3Upgrade After (ctxVersion tc) (ctxCurrentBlockHeight tc) = []
+    | afterFork Pact4Coin3 (ctxVersion tc) (ctxChainId tc) (ctxCurrentBlockHeight tc) = []
     | otherwise = [FlagDisablePact40]
 
 enablePact420 :: TxContext -> [ExecutionFlag]
 enablePact420 tc
-    | pact420Upgrade (ctxVersion tc) (ctxCurrentBlockHeight tc) = []
+    | atOrAfterFork Pact420 (ctxVersion tc) (ctxChainId tc) (ctxCurrentBlockHeight tc) = []
     | otherwise = [FlagDisablePact420]
 
 enablePactModuleMemcheck :: TxContext -> [ExecutionFlag]
 enablePactModuleMemcheck tc
-    | chainweb213Pact (ctxVersion tc) (ctxCurrentBlockHeight tc) = []
+    | atOrAfterFork Chainweb213Pact (ctxVersion tc) (ctxChainId tc) (ctxCurrentBlockHeight tc) = []
     | otherwise = [FlagDisableInlineMemCheck]
 
 enablePact43 :: TxContext -> [ExecutionFlag]
 enablePact43 tc
-    | chainweb214Pact After (ctxVersion tc) (ctxCurrentBlockHeight tc) = []
+    | afterFork Chainweb214Pact (ctxVersion tc) (ctxChainId tc) (ctxCurrentBlockHeight tc) = []
     | otherwise = [FlagDisablePact43]
 
 enablePact431 :: TxContext -> [ExecutionFlag]
 enablePact431 tc
-    | chainweb215Pact After (ctxVersion tc) (ctxCurrentBlockHeight tc) = []
+    | afterFork Chainweb215Pact (ctxVersion tc) (ctxChainId tc) (ctxCurrentBlockHeight tc) = []
     | otherwise = [FlagDisablePact431]
 
 enablePact44 :: TxContext -> [ExecutionFlag]
 enablePact44 tc
-    | chainweb216Pact After (ctxVersion tc) (ctxCurrentBlockHeight tc) = []
+    | afterFork Chainweb216Pact (ctxVersion tc) (ctxChainId tc) (ctxCurrentBlockHeight tc) = []
     | otherwise = [FlagDisablePact44]
 
 enablePact45 :: TxContext -> [ExecutionFlag]
 enablePact45 tc
-    | chainweb217Pact After (ctxVersion tc) (ctxCurrentBlockHeight tc) = []
+    | afterFork Chainweb217Pact (ctxVersion tc) (ctxChainId tc) (ctxCurrentBlockHeight tc) = []
     | otherwise = [FlagDisablePact45]
 
 enableNewTrans :: TxContext -> [ExecutionFlag]
@@ -1124,13 +1131,13 @@ mkMagicCapSlot c = CapSlot CapCallStack cap []
 -- the 'ExecMsg'.
 --
 buildExecParsedCode
-    :: Maybe (ChainwebVersion, BlockHeight)
+    :: PactParserVersion
     -> Maybe Value
     -> Text
     -> IO (ExecMsg ParsedCode)
-buildExecParsedCode chainCtx value code = maybe (go Null) go value
+buildExecParsedCode ppv value code = maybe (go Null) go value
   where
-    go val = case parsePact chainCtx code of
+    go val = case parsePact ppv code of
       Right !t -> pure $! ExecMsg t val
       -- if we can't construct coin contract calls, this should
       -- fail fast

@@ -31,13 +31,13 @@ import Chainweb.Version
 -- GET Cut Client
 
 cutGetClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ClientM CutHashes
 cutGetClient (FromSingChainwebVersion (SChainwebVersion :: Sing v))
     = client (cutGetApi @v) Nothing
 
 cutGetClientLimit
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> MaxRank
     -> ClientM CutHashes
 cutGetClientLimit (FromSingChainwebVersion (SChainwebVersion :: Sing v))
@@ -47,7 +47,7 @@ cutGetClientLimit (FromSingChainwebVersion (SChainwebVersion :: Sing v))
 -- PUT Cut Client
 
 cutPutClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> CutHashes
     -> ClientM NoContent
 cutPutClient (FromSingChainwebVersion (SChainwebVersion :: Sing v)) = client $ cutPutApi @v

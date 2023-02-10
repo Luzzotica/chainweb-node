@@ -83,6 +83,7 @@ makeLensesFor
     ] ''CutResources
 
 instance HasChainwebVersion (CutResources logger tbl) where
+    type DevConfig (CutResources logger tbl) = DevVersionConfig
     _chainwebVersion = _chainwebVersion . _cutResCutDb
     {-# INLINE _chainwebVersion #-}
 
@@ -117,7 +118,7 @@ withCutResources cutDbParams peer logger rdb webchain payloadDb mgr pact f = do
             , _cutResCutDb = cutDb
             , _cutResLogger = logger
             , _cutResCutSync = CutSyncResources
-                { _cutResSyncSession = C.syncSession v (_peerInfo $ _peerResPeer peer) cutDb
+                { _cutResSyncSession = C.syncSession (chainwebVersionTag v) (_peerInfo $ _peerResPeer peer) cutDb
                 , _cutResSyncLogger = addLabel ("sync", "cut") syncLogger
                 }
             , _cutResHeaderSync = CutSyncResources
@@ -200,7 +201,7 @@ mkCutNetworkSync mgr doPeerSync cuts label cutSync = bracket create destroy $ \n
     s = _cutResSyncSession cutSync
 
     create = do
-        !n <- p2pCreateNode v CutNetwork peer (logFunction logger) peerDb mgr doPeerSync s
+        !n <- p2pCreateNode (chainwebVersionTag v) CutNetwork peer (logFunction logger) peerDb mgr doPeerSync s
         logFunctionText logger Info $ label <> ": initialized"
         return n
 

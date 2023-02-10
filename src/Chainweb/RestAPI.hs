@@ -221,12 +221,12 @@ someChainwebServer
     -> ChainwebServerDbs t tbl
     -> SomeServer
 someChainwebServer config dbs =
-    maybe mempty (someCutServer v cutPeerDb) cuts
-    <> maybe mempty (someSpvServers v) cuts
-    <> somePayloadServers v p2pPayloadBatchLimit payloads
-    <> someBlockHeaderDbServers v blocks
-    <> Mempool.someMempoolServers v mempools
-    <> someP2pServers v peers
+    maybe mempty (someCutServer vtag cutPeerDb) cuts
+    <> maybe mempty (someSpvServers vtag) cuts
+    <> somePayloadServers vtag p2pPayloadBatchLimit payloads
+    <> someBlockHeaderDbServers vtag blocks
+    <> Mempool.someMempoolServers vtag mempools
+    <> someP2pServers vtag peers
     <> someGetConfigServer config
   where
     payloads = _chainwebServerPayloadDbs dbs
@@ -236,6 +236,7 @@ someChainwebServer config dbs =
     mempools = _chainwebServerMempools dbs
     cutPeerDb = fromJuste $ lookup CutNetwork peers
     v = _configChainwebVersion config
+    vtag = chainwebVersionTag v
 
 -- -------------------------------------------------------------------------- --
 -- Chainweb P2P API Application
@@ -314,7 +315,7 @@ servePeerDbSocketTls settings certChain key sock v nid pdb m =
         $ chainwebP2pMiddlewares
         $ someServerApplication
         $ someP2pServer
-        $ somePeerDbVal v nid pdb
+        $ somePeerDbVal (chainwebVersionTag v) nid pdb
 
 -- -------------------------------------------------------------------------- --
 -- Chainweb Service API Application
@@ -334,21 +335,22 @@ someServiceApiServer
     -> SomeServer
 someServiceApiServer v dbs pacts mr (HeaderStream hs) (Rosetta r) backupEnv pbl =
     someHealthCheckServer
-    <> maybe mempty (someBackupServer v) backupEnv
-    <> maybe mempty (someNodeInfoServer v) cuts
-    <> PactAPI.somePactServers v pacts
-    <> maybe mempty (Mining.someMiningServer v) mr
-    <> maybe mempty (someHeaderStreamServer v) (bool Nothing cuts hs)
+    <> maybe mempty (someBackupServer vtag) backupEnv
+    <> maybe mempty (someNodeInfoServer vtag) cuts
+    <> PactAPI.somePactServers vtag pacts
+    <> maybe mempty (Mining.someMiningServer vtag) mr
+    <> maybe mempty (someHeaderStreamServer vtag) (bool Nothing cuts hs)
     <> maybe mempty (bool mempty (someRosettaServer v payloads concreteMs cutPeerDb concretePacts) r) cuts
         -- TODO: not sure if passing the correct PeerDb here
         -- TODO: why does Rosetta need a peer db at all?
         -- TODO: simplify number of resources passing to rosetta
 
     -- GET Cut, Payload, and Headers endpoints
-    <> maybe mempty (someCutGetServer v) cuts
-    <> somePayloadServers v pbl payloads
-    <> someBlockHeaderDbServers v blocks
+    <> maybe mempty (someCutGetServer vtag) cuts
+    <> somePayloadServers vtag pbl payloads
+    <> someBlockHeaderDbServers vtag blocks
   where
+    vtag = chainwebVersionTag v
     cuts = _chainwebServerCutDb dbs
     peers = _chainwebServerPeerDbs dbs
     concreteMs = second PactAPI._pactServerDataMempool <$> pacts

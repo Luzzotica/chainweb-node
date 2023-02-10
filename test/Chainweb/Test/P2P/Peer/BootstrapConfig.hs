@@ -33,20 +33,20 @@ import P2P.Peer
 
 -- | Peer configuration for bootstrap hard-coded bootstrap peer infos.
 --
-bootstrapPeerConfig :: ChainwebVersion -> [PeerConfig]
+bootstrapPeerConfig :: ChainwebVersion dc -> [PeerConfig]
 bootstrapPeerConfig v@Test{} = testBootstrapPeerConfig v
 bootstrapPeerConfig v@TimedConsensus{} = testBootstrapPeerConfig v
 bootstrapPeerConfig v@PowConsensus{} = testBootstrapPeerConfig v
 bootstrapPeerConfig v@TimedCPM{} = testBootstrapPeerConfig v
 bootstrapPeerConfig v@FastTimedCPM{} = testBootstrapPeerConfig v
-bootstrapPeerConfig Development = error
+bootstrapPeerConfig Development{} = error
     $ "bootstrap peer config isn't defined for chainweb version Development"
 bootstrapPeerConfig Testnet04 = error
     $ "bootstrap peer config isn't defined for chainweb version Testnet04"
 bootstrapPeerConfig Mainnet01 = error
     $ "bootstrap peer config isn't defined for chainweb version Testnet04"
 
-testBootstrapPeerConfig :: ChainwebVersion -> [PeerConfig]
+testBootstrapPeerConfig :: ChainwebVersion dc -> [PeerConfig]
 testBootstrapPeerConfig v =
     [ PeerConfig
         { _peerConfigAddr = _peerAddr $ head (bootstrapPeerInfos v)
@@ -65,13 +65,13 @@ testBootstrapPeerConfig v =
 -- Public Chainweb versions should rely on public DNS names with official TLS
 -- certificates for bootstrapping.
 --
-bootstrapCertificate :: ChainwebVersion -> X509CertPem
+bootstrapCertificate :: ChainwebVersion dc -> X509CertPem
 bootstrapCertificate Test{} = testBootstrapCertificate
 bootstrapCertificate TimedConsensus{} = testBootstrapCertificate
 bootstrapCertificate PowConsensus{} = testBootstrapCertificate
 bootstrapCertificate TimedCPM{} = testBootstrapCertificate
 bootstrapCertificate FastTimedCPM{} = testBootstrapCertificate
-bootstrapCertificate Development = error
+bootstrapCertificate Development{} = error
     $ "bootstrap certificate isn't defined for chainweb version Development"
 bootstrapCertificate Testnet04 = error
     $ "bootstrap certificate isn't defined for chainweb version Testnet04"
@@ -127,13 +127,13 @@ testBootstrapCertificate = X509CertPem $ B8.intercalate "\n"
     ]
 #endif
 
-bootstrapKey :: ChainwebVersion -> X509KeyPem
+bootstrapKey :: ChainwebVersion dc -> X509KeyPem
 bootstrapKey Test{} = testBootstrapKey
 bootstrapKey TimedConsensus{} = testBootstrapKey
 bootstrapKey PowConsensus{} = testBootstrapKey
 bootstrapKey TimedCPM{} = testBootstrapKey
 bootstrapKey FastTimedCPM{} = testBootstrapKey
-bootstrapKey Development = error
+bootstrapKey Development{} = error
     $ "bootstrap key isn't defined for chainweb version Development"
 bootstrapKey Testnet04 = error
     $ "bootstrap key isn't defined for chainweb version Testnet04"

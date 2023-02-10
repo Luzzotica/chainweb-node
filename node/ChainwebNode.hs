@@ -185,7 +185,7 @@ getBackupsDir conf = (</> "backups") <$> getDbBaseDir conf
 getDbBaseDir :: HasCallStack => ChainwebNodeConfiguration -> IO FilePath
 getDbBaseDir conf = case _nodeConfigDatabaseDirectory conf of
     Nothing -> getXdgDirectory XdgData
-        $ "chainweb-node" </> sshow v
+        $ "chainweb-node" </> sshow (chainwebVersionTag v)
     Just d -> return d
   where
     v = _configChainwebVersion $ _nodeConfigChainweb conf
@@ -431,7 +431,7 @@ withNodeLogger logConfig v f = runManaged $ do
 
     liftIO $ f
         $ maybe id (\x -> addLabel ("cluster", toText x)) (_logConfigClusterId logConfig)
-        $ addLabel ("chainwebVersion", sshow v)
+        $ addLabel ("chainwebVersion", sshow (chainwebVersionTag v))
         $ logger
   where
     teleLogConfig = _logConfigTelemetryBackend logConfig

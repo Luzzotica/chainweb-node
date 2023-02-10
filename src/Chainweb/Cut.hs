@@ -124,7 +124,6 @@ import qualified Streaming.Prelude as S
 
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis
 import Chainweb.BlockHeight
 import Chainweb.BlockWeight
 import Chainweb.ChainId
@@ -146,7 +145,7 @@ import Chainweb.WebBlockHeaderDB
 -- A cut also satisfies the properties that
 --
 -- * the graph is valid,
--- * the graph corresponds to the 'ChainwebVersion',
+-- * the graph corresponds to the 'ChainwebVersionTag,
 -- * the set of 'ChainId's of the cut are exactly the vertices of the graph,
 -- * all blockHeaders are valid (which is guaranteed by 'genesisBlockHeader')
 --   with respect to the graph.
@@ -453,7 +452,7 @@ limitCutHeaders whdb h ch = _cutHeaders <$> limitCut whdb h Cut'
 -- This guarantees that
 --
 -- * the graph is valid,
--- * the graph corresponds to the 'ChainwebVersion',
+-- * the graph corresponds to the 'ChainwebVersionTag,
 -- * the set of 'ChainId's of the cut are the exactly the vertices of the graph,
 -- * all blockHeaders are valid (which is guaranteed by 'genesisBlockHeader').
 --

@@ -12,6 +12,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- Module: Chainweb.Test.MultiNode
@@ -182,7 +183,7 @@ multiBootstrapConfig conf = conf
     & set (configP2p . p2pConfigPeer) peerConfig
     & set (configP2p . p2pConfigKnownPeers) []
   where
-    peerConfig = (head $ bootstrapPeerConfig $ _configChainwebVersion conf)
+    peerConfig = (head $ bootstrapPeerConfig $ chainwebVersionTag $ _configChainwebVersion conf)
         & set peerConfigPort 0
         -- Normally, the port of bootstrap nodes is hard-coded. But in
         -- test-suites that may run concurrently we want to use a port that is
@@ -298,13 +299,15 @@ replayTest
     -> ChainwebVersion
     -> Natural
     -> TestTree
-replayTest loglevel v n = after AllFinish "ConsensusNetwork" $ testCaseSteps name $ \step -> 
-    withTempRocksDb "replay-test-rocks" $ \rdb -> 
+replayTest loglevel v n = after AllFinish "ConsensusNetwork" $ testCaseSteps name $ \step ->
+    withTempRocksDb "replay-test-rocks" $ \rdb ->
     withSystemTempDirectory "replay-test-pact" $ \pactDbDir -> do
         let tastylog = step . T.unpack
         tastylog "phase 1..."
         stateVar <- newMVar $ emptyConsensusState v
-        let ct = harvestConsensusState (genericLogger loglevel T.putStrLn) stateVar
+        let
+          ct :: Int -> StartedChainweb logger -> IO ()
+          ct = harvestConsensusState (genericLogger loglevel T.putStrLn) stateVar
         runNodesForSeconds loglevel T.putStrLn (multiConfig v n) 2 60 rdb pactDbDir ct
         Just stats1 <- consensusStateSummary <$> swapMVar stateVar (emptyConsensusState v)
         assertGe "maximum cut height before reset" (Actual $ _statMaxHeight stats1) (Expected $ 10)
@@ -364,9 +367,9 @@ test
     -> Natural
     -> Seconds
     -> TestTree
-test loglevel v n seconds = testCaseSteps name $ \f -> 
+test loglevel v n seconds = testCaseSteps name $ \f ->
     -- Count log messages and only print the first 60 messages
-    withTempRocksDb "multinode-tests" $ \rdb -> 
+    withTempRocksDb "multinode-tests" $ \rdb ->
     withSystemTempDirectory "replay-test-pact" $ \pactDbDir -> do
         let tastylog = f . T.unpack
 #if DEBUG_MULTINODE_TEST
@@ -431,6 +434,7 @@ data ConsensusState = ConsensusState
     deriving (Show, Generic, NFData)
 
 instance HasChainwebVersion ConsensusState where
+    type DevConfig ConsensusState = DevVersionConfig
     _chainwebVersion = _stateChainwebVersion
     {-# INLINE _chainwebVersion #-}
 

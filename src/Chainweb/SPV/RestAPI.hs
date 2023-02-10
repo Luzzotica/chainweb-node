@@ -97,11 +97,11 @@ spvApi = Proxy
 -- -------------------------------------------------------------------------- --
 -- Some Cut Api
 
-someSpvApi :: ChainwebVersion -> ChainId -> SomeApi
+someSpvApi :: ChainwebVersionName -> ChainId -> SomeApi
 someSpvApi
     (FromSingChainwebVersion (SChainwebVersion :: Sing v))
     (FromSingChainId (SChainId :: Sing c))
     = SomeApi $ spvApi @v @c
 
-someSpvApis :: ChainwebVersion -> [ChainId] -> SomeApi
+someSpvApis :: ChainwebVersionName -> [ChainId] -> SomeApi
 someSpvApis v = mconcat . fmap (someSpvApi v)

@@ -28,6 +28,7 @@ import Chainweb.BlockHeaderDB.Internal
 import Chainweb.Test.TreeDB (RunStyle(..), treeDbInvariants)
 import Chainweb.Test.Utils (insertN, toyBlockHeaderDb, withToyDB, toyChainId, withTestBlockHeaderDb)
 import Chainweb.TreeDB
+import Chainweb.Version
 
 import Chainweb.Storage.Table.RocksDB
 
@@ -46,7 +47,7 @@ tests rdb = testGroup "Unit Tests"
       [ testCase "height" $ correctHeight rdb
       ]
     , treeDbInvariants
-        (\x f -> withTestBlockHeaderDb rdb x (\db -> f db (traverse_ . unsafeInsertBlockHeaderDb)))
+        (\x f -> withTestBlockHeaderDb rdb (Development defaultDevVersionConfig) x (\db -> f db (traverse_ . unsafeInsertBlockHeaderDb)))
         Parallel
     ]
 

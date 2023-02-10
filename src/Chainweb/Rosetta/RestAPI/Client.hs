@@ -64,7 +64,7 @@ rosettaAccountBalanceApiClient_
 rosettaAccountBalanceApiClient_ = client (rosettaAccountBalanceApi @v)
 
 rosettaAccountBalanceApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> AccountBalanceReq
         -- ^ Contains a network id, account id, and a partial block identifier
         -- which is not populated.
@@ -85,7 +85,7 @@ rosettaBlockTransactionApiClient_
 rosettaBlockTransactionApiClient_ = client (rosettaBlockTransactionApi @v)
 
 rosettaBlockTransactionApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> BlockTransactionReq
         -- ^ Contains a network id, a block id, and a transaction id
     -> ClientM BlockTransactionResp
@@ -102,7 +102,7 @@ rosettaBlockApiClient_
 rosettaBlockApiClient_ = client (rosettaBlockApi @v)
 
 rosettaBlockApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> BlockReq
         -- ^ Contains a network id and a partial block id
     -> ClientM BlockResp
@@ -121,7 +121,7 @@ rosettaConstructionDeriveApiClient_
 rosettaConstructionDeriveApiClient_ = client (rosettaConstructionDeriveApi @v)
 
 rosettaConstructionDeriveApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionDeriveReq
     -> ClientM ConstructionDeriveResp
 rosettaConstructionDeriveApiClient
@@ -136,7 +136,7 @@ rosettaConstructionPreprocessApiClient_
 rosettaConstructionPreprocessApiClient_ = client (rosettaConstructionPreprocessApi @v)
 
 rosettaConstructionPreprocessApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionPreprocessReq
     -> ClientM ConstructionPreprocessResp
 rosettaConstructionPreprocessApiClient
@@ -153,7 +153,7 @@ rosettaConstructionMetadataApiClient_
 rosettaConstructionMetadataApiClient_ = client (rosettaConstructionMetadataApi @v)
 
 rosettaConstructionMetadataApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionMetadataReq
         -- ^ contains a network id and a metadata object which specifies the
         -- metadata to return.
@@ -170,7 +170,7 @@ rosettaConstructionPayloadsApiClient_
 rosettaConstructionPayloadsApiClient_ = client (rosettaConstructionPayloadsApi @v)
 
 rosettaConstructionPayloadsApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionPayloadsReq
     -> ClientM ConstructionPayloadsResp
 rosettaConstructionPayloadsApiClient
@@ -185,7 +185,7 @@ rosettaConstructionParseApiClient_
 rosettaConstructionParseApiClient_ = client (rosettaConstructionParseApi @v)
 
 rosettaConstructionParseApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionParseReq
     -> ClientM ConstructionParseResp
 rosettaConstructionParseApiClient
@@ -200,7 +200,7 @@ rosettaConstructionCombineApiClient_
 rosettaConstructionCombineApiClient_ = client (rosettaConstructionCombineApi @v)
 
 rosettaConstructionCombineApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionCombineReq
     -> ClientM ConstructionCombineResp
 rosettaConstructionCombineApiClient
@@ -215,7 +215,7 @@ rosettaConstructionHashApiClient_
 rosettaConstructionHashApiClient_ = client (rosettaConstructionHashApi @v)
 
 rosettaConstructionHashApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionHashReq
     -> ClientM TransactionIdResp
 rosettaConstructionHashApiClient
@@ -231,7 +231,7 @@ rosettaConstructionSubmitApiClient_
 rosettaConstructionSubmitApiClient_ = client (rosettaConstructionSubmitApi @v)
 
 rosettaConstructionSubmitApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> ConstructionSubmitReq
         -- ^ Contains a network id and a signed transaction
     -> ClientM TransactionIdResp
@@ -251,7 +251,7 @@ rosettaMempoolTransactionApiClient_
 rosettaMempoolTransactionApiClient_ = client (rosettaMempoolTransactionApi @v)
 
 rosettaMempoolTransactionApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> MempoolTransactionReq
         -- ^ Contains a network id and a transaction id
     -> ClientM MempoolTransactionResp
@@ -268,7 +268,7 @@ rosettaMempoolApiClient_
 rosettaMempoolApiClient_ = client (rosettaMempoolApi @v)
 
 rosettaMempoolApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> NetworkReq
       -- ^ contains a network id
     -> ClientM MempoolResp
@@ -288,7 +288,7 @@ rosettaNetworkListApiClient_
 rosettaNetworkListApiClient_ = client (rosettaNetworkListApi @v)
 
 rosettaNetworkListApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> MetadataReq
         -- ^ Contains an optional object with metadata
     -> ClientM NetworkListResp
@@ -305,7 +305,7 @@ rosettaNetworkOptionsApiClient_
 rosettaNetworkOptionsApiClient_ = client (rosettaNetworkOptionsApi @v)
 
 rosettaNetworkOptionsApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> NetworkReq
         -- ^ Contains a network identifier and optional object with metadata
     -> ClientM NetworkOptionsResp
@@ -322,7 +322,7 @@ rosettaNetworkStatusApiClient_
 rosettaNetworkStatusApiClient_ = client (rosettaNetworkStatusApi @v)
 
 rosettaNetworkStatusApiClient
-    :: ChainwebVersion
+    :: ChainwebVersionTag
     -> NetworkReq
         -- ^ Contains a network identifier and optional object with metadata
     -> ClientM NetworkStatusResp

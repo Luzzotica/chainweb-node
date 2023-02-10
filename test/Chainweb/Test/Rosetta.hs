@@ -385,7 +385,7 @@ checkValidateNetwork = do
     run :: (ChainwebVersion, NetworkId) -> Either RosettaFailure T.Text
     run (v,net) = either Left (pure . chainIdToText) (validateNetwork v net)
 
-    validNetId = (Development, NetworkId
+    validNetId = (Development defaultDevVersionConfig, NetworkId
       { _networkId_blockchain = "kadena"
       , _networkId_network = "development"
       , _networkId_subNetworkId = Just $ SubNetworkId "0" Nothing

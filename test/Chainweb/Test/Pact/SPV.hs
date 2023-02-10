@@ -115,10 +115,10 @@ tests = testGroup "Chainweb.Test.Pact.SPV"
     , testCaseSteps "wrong target chain in proofs fail" wrongChainProof
     ]
 
-testVer :: ChainwebVersion
+testVer :: ChainwebVersion dc
 testVer = FastTimedCPM triangleChainGraph
 
-bridgeVer :: ChainwebVersion
+bridgeVer :: ChainwebVersion dc
 bridgeVer = FastTimedCPM pairChainGraph
 
 logg :: LogMessage a => LogLevel -> a -> IO ()

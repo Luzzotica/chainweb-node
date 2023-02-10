@@ -28,6 +28,7 @@ import GHC.Generics
 import Servant
 
 import Chainweb.BlockHeight
+import Chainweb.ChainId
 import Chainweb.Cut.CutHashes
 import Chainweb.CutDB
 import Chainweb.Graph
@@ -41,11 +42,11 @@ someNodeInfoApi = SomeApi (Proxy @NodeInfoApi)
 
 someNodeInfoServer :: ChainwebVersion -> CutDb tbl -> SomeServer
 someNodeInfoServer v c =
-  SomeServer (Proxy @NodeInfoApi) (nodeInfoHandler v $ someCutDbVal v c)
+  SomeServer (Proxy @NodeInfoApi) (nodeInfoHandler v $ someCutDbVal (_versionName v) c)
 
 data NodeInfo = NodeInfo
   {
-    nodeVersion :: ChainwebVersion
+    nodeVersion :: ChainwebVersionName
   , nodeApiVersion :: Text
   , nodeChains :: [Text]
   -- ^ Current list of chains
@@ -68,7 +69,7 @@ nodeInfoHandler v (SomeCutDb ((CutDbT db) :: CutDbT cas v)) = do
         curGraph = head $ dropWhile (\(h,_) -> h > curHeight) graphs
         curChains = map fst $ snd curGraph
     return $ NodeInfo
-      { nodeVersion = v
+      { nodeVersion = _versionName v
       , nodeApiVersion = prettyApiVersion
       , nodeChains = T.pack . show <$> curChains
       , nodeNumberOfChains = length curChains
@@ -80,7 +81,7 @@ nodeInfoHandler v (SomeCutDb ((CutDbT db) :: CutDbT cas v)) = do
 unpackGraphs :: ChainwebVersion -> [(BlockHeight, [(Int, [Int])])]
 unpackGraphs v = gs
   where
-    gs = map (second graphAdjacencies) $ NE.toList $ chainwebGraphs v
+    gs = map (second graphAdjacencies) $ NE.toList $ ruleElems (BlockHeight 0) $ _versionGraphs v
     graphAdjacencies = map unChain . HashMap.toList . fmap HashSet.toList . G.adjacencySets . view chainGraphGraph
     unChain (a, bs) = (chainIdInt a, map chainIdInt bs)
 

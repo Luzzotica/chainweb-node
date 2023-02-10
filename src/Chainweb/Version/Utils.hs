@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -55,6 +56,9 @@ module Chainweb.Version.Utils
 ) where
 
 import Chainweb.BlockHeight
+import Chainweb.BlockHeader
+import Chainweb.ChainId
+import Chainweb.Difficulty
 import Chainweb.Time
 
 import Data.Foldable
@@ -110,29 +114,7 @@ atCutHeight h = snd . fromJuste . M.lookupLE h
 -- @
 --
 chainGraphs :: HasChainwebVersion v => v -> M.Map BlockHeight ChainGraph
-chainGraphs v = case _chainwebVersion v of
-    Mainnet01 -> mainnet01GraphMap
-    Testnet04 -> testnet04GraphMap
-    Development -> developmentGraphMap
-    x -> M.fromList . toList $ chainwebGraphs x
-
--- | Memoized mainnet01 chainweb graphs map
---
-mainnet01GraphMap :: M.Map BlockHeight ChainGraph
-mainnet01GraphMap = M.fromList . toList $ chainwebGraphs Mainnet01
-{-# NOINLINE mainnet01GraphMap #-}
-
--- | Memoized testnet04 chainweb graphs map
---
-testnet04GraphMap :: M.Map BlockHeight ChainGraph
-testnet04GraphMap = M.fromList . toList $ chainwebGraphs Testnet04
-{-# NOINLINE testnet04GraphMap #-}
-
--- | Memoized devnet chainweb graphs map
---
-developmentGraphMap :: M.Map BlockHeight ChainGraph
-developmentGraphMap = M.fromList . toList $ chainwebGraphs Development
-{-# NOINLINE developmentGraphMap #-}
+chainGraphs v = undefined -- M.fromDistinctAscList . toList $ _versionGraphs $ _chainwebVersion v
 
 -- | BlockHeight intervals for the chain graphs of a chainweb version up to a
 -- given block height.
@@ -283,7 +265,7 @@ globalBlockRateAt
     -> Double
 globalBlockRateAt v h = int r / int (chainCountAt v h)
   where
-    BlockRate r = blockRate (_chainwebVersion v)
+    BlockRate r = _versionBlockRate (_chainwebVersion v)
 
 -- -------------------------------------------------------------------------- --
 -- Cut Heights
@@ -310,7 +292,7 @@ chainGraphsByCutHeight
     :: HasChainwebVersion v
     => v
     -> M.Map CutHeight ChainGraph
-chainGraphsByCutHeight = M.fromAscList
+chainGraphsByCutHeight = M.fromDistinctAscList
     . fmap (\(h,g) -> (int h * int (order g), g))
     . M.toAscList
     . chainGraphs
@@ -414,7 +396,7 @@ expectedBlockCountAfterSeconds v cid s = max 0 (1 + (int s / int r) - int gh)
     -- The `max 0` term is required for chains that were added during graph transitions
     -- and thus have `genesisHeight > 0`
   where
-    BlockRate r = blockRate (_chainwebVersion v)
+    BlockRate r = _versionBlockRate (_chainwebVersion v)
     gh = genesisHeight (_chainwebVersion v) (_chainId cid)
 
 -- | This function is useful for performance testing when calculating the
@@ -450,7 +432,7 @@ expectedBlockHeightAfterSeconds
     -> Double
 expectedBlockHeightAfterSeconds v s = (int s / int r)
   where
-    BlockRate r = blockRate (_chainwebVersion v)
+    BlockRate r = _versionBlockRate (_chainwebVersion v)
 
 -- | The expected CutHeight after the given number of seconds has passed.
 --

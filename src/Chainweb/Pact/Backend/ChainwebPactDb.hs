@@ -75,12 +75,14 @@ import Pact.Types.Util (AsString(..))
 -- chainweb
 
 import Chainweb.BlockHash
+import Chainweb.BlockHeader
 import Chainweb.BlockHeight
+import Chainweb.ChainId
 import Chainweb.Pact.Backend.DbCache
 import Chainweb.Pact.Backend.Types
 import Chainweb.Pact.Backend.Utils
 import Chainweb.Pact.Service.Types (PactException(..), internalError)
-import Chainweb.Version (ChainwebVersion, ChainId, genesisHeight)
+import Chainweb.Version
 import Chainweb.Utils (encodeToByteString, sshow)
 import Chainweb.Utils.Serialization
 

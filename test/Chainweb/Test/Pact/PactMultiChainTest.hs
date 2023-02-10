@@ -64,7 +64,7 @@ import Chainweb.WebPactExecutionService
 
 import Chainweb.Storage.Table (casLookupM)
 
-testVersion :: ChainwebVersion
+testVersion :: ChainwebVersion dc
 testVersion = FastTimedCPM peterson
 
 cid :: ChainId

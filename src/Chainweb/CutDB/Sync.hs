@@ -49,7 +49,7 @@ import P2P.Session
 -- Client Env
 
 data CutClientEnv = CutClientEnv
-    { _envChainwebVersion :: !ChainwebVersion
+    { _envChainwebVersion :: !ChainwebVersionName
     , _envClientEnv :: !ClientEnv
     }
     deriving (Generic)
@@ -76,7 +76,7 @@ catchupStepSize :: CutHeight
 catchupStepSize = 1000
 
 syncSession
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> PeerInfo
     -> CutDb tbl
     -> P2pSession

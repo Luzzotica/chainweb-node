@@ -84,7 +84,7 @@ debug = putStrLn
 debug = const $ return ()
 #endif
 
-v :: ChainwebVersion
+v :: ChainwebVersion dc
 v = FastTimedCPM petersonChainGraph
 
 -- | Backoff up to a constant 250ms, limiting to ~40s

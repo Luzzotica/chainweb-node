@@ -191,11 +191,11 @@ pactServiceApi = Proxy
 -- -------------------------------------------------------------------------- --
 -- Some Cut Api
 
-somePactServiceApi :: ChainwebVersion -> ChainId -> SomeApi
+somePactServiceApi :: ChainwebVersionName -> ChainId -> SomeApi
 somePactServiceApi
     (FromSingChainwebVersion (SChainwebVersion :: Sing v))
     (FromSingChainId (SChainId :: Sing c))
     = SomeApi $ pactServiceApi @v @c
 
-somePactServiceApis :: ChainwebVersion -> [ChainId] -> SomeApi
+somePactServiceApis :: ChainwebVersionName -> [ChainId] -> SomeApi
 somePactServiceApis v = mconcat . fmap (somePactServiceApi v)

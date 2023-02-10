@@ -8,6 +8,7 @@ module Chainweb.Test.Mempool.Consensus
   ( tests
   ) where
 
+import Control.Lens hiding (children, elements, pre)
 import Control.Monad.IO.Class
 
 import qualified Data.ByteString.Short as SB
@@ -49,6 +50,7 @@ import Chainweb.Test.Orphans.Time ()
 import Chainweb.Test.Utils
 import Chainweb.Test.Utils.BlockHeader
 import Chainweb.Time
+import Chainweb.Version
 
 import Chainweb.Storage.Table.RocksDB
 
@@ -355,7 +357,9 @@ header' h = do
             :+: MerkleLogBody mempty
    where
     BlockCreationTime t = _blockCreationTime h
-    target = powTarget (ParentHeader h) mempty t'
+    target = powTarget
+      (v & versionConfig .~ error "Chainweb.Test.Mempool.Consensus: version config not specified")
+      (ParentHeader h) mempty t'
     v = _blockChainwebVersion h
     t' = BlockCreationTime (scaleTimeSpan (10 :: Int) second `add` t)
 

@@ -213,6 +213,7 @@ chainwebSocket :: Getter (Chainweb logger t) Socket
 chainwebSocket = chainwebPeer . peerResSocket
 
 instance HasChainwebVersion (Chainweb logger t) where
+    type DevConfig (Chainweb logger t) = DevVersionConfig
     _chainwebVersion = _chainwebVersion . _chainwebCutResources
     {-# INLINE _chainwebVersion #-}
 
@@ -325,11 +326,11 @@ validatingMempoolConfig cid v gl gp mv = Mempool.InMemConfig
         let !pay = payloadObj . P._cmdPayload $ tx
             pcid = P._pmChainId $ P._pMeta pay
             sigs = length (P._cmdSigs tx)
-            ver  = P._pNetworkId pay >>= fromText @ChainwebVersion . P._networkId
+            ver  = P._pNetworkId pay >>= fromText @ChainwebVersionTag . P._networkId
         tcid <- note (Mempool.InsertErrorOther "Unparsable ChainId") $ fromPactChainId pcid
         if | tcid /= cid   -> Left Mempool.InsertErrorMetadataMismatch
            | sigs > 100    -> Left $ Mempool.InsertErrorOther "Too many signatures"
-           | ver /= Just v -> Left Mempool.InsertErrorMetadataMismatch
+           | ver /= Just (chainwebVersionTag v) -> Left Mempool.InsertErrorMetadataMismatch
            | otherwise     -> Right tx
 
 data StartedChainweb logger
@@ -366,7 +367,7 @@ withChainwebInternal
     -> IO ()
 withChainwebInternal conf logger peer serviceSock rocksDb pactDbDir backupDir resetDb inner = do
 
-    initializePayloadDb v payloadDb
+    initializePayloadDb (chainwebVersionTag v) payloadDb
 
     -- Garbage Collection
     -- performed before PayloadDb and BlockHeaderDb used by other components
@@ -558,7 +559,7 @@ withChainwebInternal conf logger peer serviceSock rocksDb pactDbDir backupDir re
 
     -- FIXME: make this configurable
     cutConfig :: CutDbParams
-    cutConfig = (defaultCutDbParams v $ _cutFetchTimeout cutConf)
+    cutConfig = (defaultCutDbParams (chainwebVersionTag v) $ _cutFetchTimeout cutConf)
         { _cutDbParamsLogLevel = Info
         , _cutDbParamsTelemetryLevel = Info
         , _cutDbParamsInitialHeightLimit = _cutInitialBlockHeightLimit cutConf
@@ -834,7 +835,7 @@ runChainweb cw = do
             PowConsensus{} -> disabled
             TimedCPM{} -> enabled c
             FastTimedCPM{} -> enabled c
-            Development -> enabled c
+            Development{} -> enabled c
             Testnet04 -> enabled c
             Mainnet01 -> enabled c
       where

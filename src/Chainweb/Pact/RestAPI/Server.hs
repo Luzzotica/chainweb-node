@@ -149,7 +149,7 @@ data SomePactServerData = forall v c logger tbl
 somePactServerData
     :: CanReadablePayloadCas tbl
     => Logger logger
-    => ChainwebVersion
+    => ChainwebVersionName
     -> ChainId
     -> PactServerData logger tbl
     -> SomePactServerData
@@ -198,7 +198,7 @@ somePactServer (SomePactServerData (db :: PactServerData_ v c logger tbl))
 somePactServers
     :: CanReadablePayloadCas tbl
     => Logger logger
-    => ChainwebVersion
+    => ChainwebVersionName
     -> [(ChainId, PactServerData logger tbl)]
     -> SomeServer
 somePactServers v =

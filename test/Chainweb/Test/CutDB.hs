@@ -127,14 +127,14 @@ withTestCutDb rdb v conf n pactIO logfun f = do
     rocksDb <- testRocksDb "withTestCutDb" rdb
     let payloadDb = newPayloadDb rocksDb
         cutHashesDb = cutHashesTable rocksDb
-    initializePayloadDb v payloadDb
+    initializePayloadDb (chainwebVersionTag v) payloadDb
     webDb <- initWebBlockHeaderDb rocksDb v
     mgr <- HTTP.newManager HTTP.defaultManagerSettings
     pact <- pactIO webDb payloadDb
     withLocalWebBlockHeaderStore mgr webDb $ \headerStore ->
         withLocalPayloadStore mgr payloadDb pact $ \payloadStore ->
-            withCutDb (conf $ defaultCutDbParams v cutFetchTimeout) logfun headerStore payloadStore cutHashesDb $ \cutDb -> do
-                foldM_ (\c _ -> view _1 <$> mine defaultMiner pact cutDb c) (genesisCut v) [1..n]
+            withCutDb (conf $ defaultCutDbParams (chainwebVersionTag v) cutFetchTimeout) logfun headerStore payloadStore cutHashesDb $ \cutDb -> do
+                foldM_ (\c _ -> view _1 <$> mine defaultMiner pact cutDb c) (genesisCut $ chainwebVersionTag v) [1..n]
                 f cutHashesDb cutDb
 
 -- | Adds the requested number of new blocks to the given 'CutDb'.
@@ -284,13 +284,13 @@ startTestPayload rdb v logfun n = do
     rocksDb <- testRocksDb "startTestPayload" rdb
     let payloadDb = newPayloadDb rocksDb
         cutHashesDb = cutHashesTable rocksDb
-    initializePayloadDb v payloadDb
+    initializePayloadDb (chainwebVersionTag v) payloadDb
     webDb <- initWebBlockHeaderDb rocksDb v
     mgr <- HTTP.newManager HTTP.defaultManagerSettings
     (pserver, pstore) <- startLocalPayloadStore mgr payloadDb
     (hserver, hstore) <- startLocalWebBlockHeaderStore mgr webDb
-    cutDb <- startCutDb (defaultCutDbParams v cutFetchTimeout) logfun hstore pstore cutHashesDb
-    foldM_ (\c _ -> view _1 <$> mine defaultMiner fakePact cutDb c) (genesisCut v) [0..n]
+    cutDb <- startCutDb (defaultCutDbParams (chainwebVersionTag v) cutFetchTimeout) logfun hstore pstore cutHashesDb
+    foldM_ (\c _ -> view _1 <$> mine defaultMiner fakePact cutDb c) (genesisCut (chainwebVersionTag v)) [0..n]
     return (pserver, hserver, cutDb)
 
 
@@ -406,7 +406,7 @@ tryMineForChain miner webPact cutDb c cid = do
     outputs <- _webPactNewBlock webPact miner parent
     let payloadHash = _payloadWithOutputsPayloadHash outputs
     t <- getCurrentTimeIntegral
-    x <- testMineWithPayloadHash wdb (Nonce 0) t payloadHash cid c
+    x <- testMineWithPayloadHash (_chainwebVersion wdb) wdb (Nonce 0) t payloadHash cid c
     case x of
         Right (T2 h c') -> do
             addCutHashes cutDb (cutToCutHashes Nothing c')

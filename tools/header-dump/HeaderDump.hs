@@ -206,7 +206,7 @@ defaultConfig :: Config
 defaultConfig = Config
     { _configLogHandle = Y.StdOut
     , _configLogLevel = Y.Info
-    , _configChainwebVersion = Development
+    , _configChainwebVersion = Development defaultDevVersionConfig
     , _configChainId = Nothing
     , _configPretty = True
     , _configDatabasePath = Nothing
@@ -247,7 +247,7 @@ pConfig :: MParser Config
 pConfig = id
     <$< configLogHandle .:: Y.pLoggerHandleConfig
     <*< configLogLevel .:: Y.pLogLevel
-    <*< configChainwebVersion .:: option textReader
+    <*< configChainwebVersion .:: fmap (versionConfig .~ defaultDevVersionConfig) % option textReader
         % long "chainweb-version"
         <> help "chainweb version identifier"
     <*< configChainId .:: fmap Just % option textReader
@@ -341,7 +341,7 @@ instance ToJSON a => ToJSON (ChainData a) where
 mainWithConfig :: Config -> IO ()
 mainWithConfig config = withLog $ \logger ->
     liftIO $ run config $ logger
-        & addLabel ("version", toText $ _configChainwebVersion config)
+        & addLabel ("version", toText $ chainwebVersionTag $ _configChainwebVersion config)
         -- & addLabel ("chain", toText $ _configChainId config)
   where
     logconfig = Y.defaultLogConfig
@@ -370,7 +370,7 @@ withBlockHeaders logger config inner = do
     logg Info $ "using database at: " <> T.pack rocksDbDir
     withRocksDb_ rocksDbDir $ \rdb -> do
         let pdb = newPayloadDb rdb
-        initializePayloadDb v pdb
+        initializePayloadDb (chainwebVersionTag v) pdb
         liftIO $ logg Info "start traversing block headers"
         liftIO $ logg Info $ "header validation: " <> sshow (_configValidate config)
         withChainDbs rdb v cids (_configValidate config) start end $ inner pdb . void
@@ -457,8 +457,8 @@ run config logger = withBlockHeaders logger config $ \pdb x -> x
         | otherwise = encodeToText
 
 -- | TODO include braiding validation
-validate :: S.Stream (Of BlockHeader) IO () -> S.Stream (Of BlockHeader) IO ()
-validate s = do
+validate :: ChainwebVersion -> S.Stream (Of BlockHeader) IO () -> S.Stream (Of BlockHeader) IO ()
+validate v s = do
     now <- liftIO getCurrentTimeIntegral
     s
         & S.copy
@@ -510,9 +510,9 @@ validate s = do
         -> BlockHeader
         -> IO ()
     val now (_, parents, _, isInitial) c
-        | isGenesisBlockHeader c = void $ validateBlockHeaderM now (lookupHdr parents) c
+        | isGenesisBlockHeader c = void $ validateBlockHeaderM v now (lookupHdr parents) c
         | isInitial = validateIntrinsicM now c
-        | otherwise = void $ validateBlockHeaderM now (lookupHdr parents) c
+        | otherwise = void $ validateBlockHeaderM v now (lookupHdr parents) c
 
 -- -------------------------------------------------------------------------- --
 -- Tools
@@ -638,7 +638,7 @@ withChainDbs rdb v cids doValidation start end f = go cids mempty
         entries cdb Nothing Nothing start end $ \x ->
             go t (() <$ S.mergeOn _blockHeight s (val $ () <$ x))
 
-    val = if doValidation then validate else id
+    val = if doValidation then validate v else id
 
 #if REMOTE_DB
 -- -------------------------------------------------------------------------- --

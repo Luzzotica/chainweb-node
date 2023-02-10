@@ -59,7 +59,6 @@ import System.LogLevel
 
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis
 import Chainweb.BlockHeader.Validation
 import Chainweb.BlockHeaderDB
 import Chainweb.ChainId
@@ -174,9 +173,9 @@ memoInsert cas m k a = tableLookup cas k >>= \case
 --
 getBlockPayload
     :: CanReadablePayloadCas tbl
-    => Cas candidateCas PayloadData 
+    => Cas candidateCas PayloadData
     => WebBlockPayloadStore tbl
-    -> candidateCas 
+    -> candidateCas
     -> Priority
     -> Maybe PeerInfo
         -- ^ Peer from with the BlockPayloadHash originated, if available.
@@ -221,7 +220,7 @@ getBlockPayload s candidateStore priority maybeOrigin h = do
     pullOrigin k (Just origin) = do
         let originEnv = peerInfoClientEnv mgr origin
         logfun Debug $ taskMsg k "lookup origin"
-        runClientM (payloadClient v cid k) originEnv >>= \case
+        runClientM (payloadClient (_versionName v) cid k) originEnv >>= \case
             (Right !x) -> do
                 logfun Debug $ taskMsg k "received from origin"
                 return $ Just x
@@ -234,7 +233,7 @@ getBlockPayload s candidateStore priority maybeOrigin h = do
     queryPayloadTask :: BlockPayloadHash -> IO (Task ClientEnv PayloadData)
     queryPayloadTask k = newTask (sshow k) priority $ \logg env -> do
         logg @T.Text Debug $ taskMsg k "query remote block payload"
-        runClientM (payloadClient v cid k) env >>= \case
+        runClientM (payloadClient (_versionName v) cid k) env >>= \case
             (Right !x) -> do
                 logg @T.Text Debug $ taskMsg k "received remote block payload"
                 return x
@@ -265,8 +264,8 @@ getBlockHeaderInternal
     => PayloadDataCas candidatePayloadCas
     => WebBlockHeaderStore
     -> WebBlockPayloadStore tbl
-    -> candidateHeaderCas 
-    -> candidatePayloadCas 
+    -> candidateHeaderCas
+    -> candidatePayloadCas
     -> Priority
     -> Maybe PeerInfo
     -> ChainValue BlockHash
@@ -440,7 +439,7 @@ getBlockHeaderInternal headerStore payloadStore candidateHeaderCas candidatePayl
             (_blockHash hdr)
             (length (_payloadDataTransactions p))
             $ pact hdr p
-        casInsert (_webBlockPayloadStoreCas payloadStore) outs 
+        casInsert (_webBlockPayloadStoreCas payloadStore) outs
 
     queryBlockHeaderTask ck@(ChainValue cid k)
         = newTask (sshow ck) priority $ \l env -> chainValue <$> do
@@ -452,7 +451,7 @@ getBlockHeaderInternal headerStore payloadStore candidateHeaderCas candidatePayl
             return r
 
     rDb :: ChainwebVersion -> ChainId -> ClientEnv -> RemoteDb
-    rDb _ cid env = RemoteDb env (ALogFunction logfun) v cid
+    rDb _ cid env = RemoteDb env (ALogFunction logfun) (_versionName v) cid
 
     adjParents = toList . imap ChainValue . _getBlockHashRecord . _blockAdjacentHashes
 
@@ -524,7 +523,7 @@ getBlockHeader
     => WebBlockHeaderStore
     -> WebBlockPayloadStore tbl
     -> candidateHeaderCas
-    -> candidatePayloadCas 
+    -> candidatePayloadCas
     -> ChainId
     -> Priority
     -> Maybe PeerInfo
@@ -553,7 +552,7 @@ instance (CasKeyType (ChainValue BlockHeader) ~ k) => ReadableTable WebBlockHead
     {-# INLINE tableLookup #-}
 
 instance (CasKeyType (ChainValue BlockHeader) ~ k) => Table WebBlockHeaderCas k (ChainValue BlockHeader) where
-    tableInsert (WebBlockHeaderCas db) _ (ChainValue _ h) 
+    tableInsert (WebBlockHeaderCas db) _ (ChainValue _ h)
         = insertWebBlockHeaderDb db h
     {-# INLINE tableInsert #-}
 

@@ -112,13 +112,14 @@ accumulatorFunction typ prevAcc logsLeft lastSeen = newAcc
 
 -- | Retrieve the coin contract logs for transaction(s) in a block.
 matchLogs
-    :: LogType tx
+    :: ChainwebVersion
+    -> LogType tx
     -> BlockHeader
     -> M.Map TxId [AccountLog]
     -> CoinbaseTx (CommandResult Hash)
     -> V.Vector (CommandResult Hash)
     -> ExceptT RosettaFailure Handler tx
-matchLogs typ bh logs coinbase txs
+matchLogs v typ bh logs coinbase txs
   | bheight == genesisHeight v cid = matchGenesis
   | coinV2Upgrade v cid bheight = matchRemediation (upgradeTransactions v cid)
   | to20ChainRebalance v cid bheight = matchRemediation (twentyChainUpgradeTransactions v cid)
@@ -129,7 +130,6 @@ matchLogs typ bh logs coinbase txs
   where
     bheight = _blockHeight bh
     cid = _blockChainId bh
-    v = _blockChainwebVersion bh
 
     matchGenesis = hoistEither $ case typ of
       FullLogs -> genesisTransactions logs cid txs

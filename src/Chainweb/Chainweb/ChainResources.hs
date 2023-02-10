@@ -67,6 +67,7 @@ data ChainResources logger = ChainResources
 makeLenses ''ChainResources
 
 instance HasChainwebVersion (ChainResources logger) where
+    type DevConfig (ChainResources logger) = DevVersionConfig
     _chainwebVersion = _chainwebVersion . _chainResBlockHeaderDb
     {-# INLINE _chainwebVersion #-}
 
@@ -116,7 +117,7 @@ withChainResources
         PowConsensus{} -> emptyPactExecutionService
         TimedCPM{} -> mkPactExecutionService requestQ
         FastTimedCPM{} -> mkPactExecutionService requestQ
-        Development -> mkPactExecutionService requestQ
+        Development{} -> mkPactExecutionService requestQ
         Testnet04 -> mkPactExecutionService requestQ
         Mainnet01 -> mkPactExecutionService requestQ
 

@@ -29,7 +29,7 @@ import Chainweb.Utils
 data Env = Env
   { exe :: FilePath
   , nodes :: Word8
-  , version :: ChainwebVersion
+  , version :: ChainwebVersionTag
   , config :: FilePath
   , passthrough :: [T.Text]
   } deriving (Show)
@@ -47,13 +47,13 @@ pNodes = option auto
   (long "nodes" <> metavar "COUNT" <> value 10
    <> help "Number of Nodes to run (default: 10)")
 
-pVersion :: Parser ChainwebVersion
+pVersion :: Parser ChainwebVersionTag
 pVersion = option cver
   (long "chainweb-version" <> metavar "CHAINWEB_VERSION"
    <> value (TimedCPM petersonChainGraph)
    <> help "Chainweb Version to run the Nodes with (default: timedCPM-peterson)")
   where
-    cver :: ReadM ChainwebVersion
+    cver :: ReadM ChainwebVersionTag
     cver = eitherReader $ \s ->
         note "Illegal ChainwebVersion" . chainwebVersionFromText $ T.pack s
 

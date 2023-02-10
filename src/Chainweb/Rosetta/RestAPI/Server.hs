@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- |
 -- Module: Chainweb.Rosetta.RestAPI.Server
@@ -44,7 +45,6 @@ import Servant.Server
 -- internal modules
 
 import Chainweb.BlockHeader (BlockHeader(..))
-import Chainweb.BlockHeader.Genesis (genesisBlockHeader)
 import Chainweb.Cut (_cutMap)
 import Chainweb.CutDB
 import Chainweb.HostAddress
@@ -110,7 +110,7 @@ someRosettaServer
     -> [(ChainId, PactExecutionService)]
     -> CutDb tbl
     -> SomeServer
-someRosettaServer v@(FromSingChainwebVersion (SChainwebVersion :: Sing vT)) ps ms pdb pacts cdb =
+someRosettaServer v@(chainwebVersionTag -> (FromSingChainwebVersion (SChainwebVersion :: Sing vT))) ps ms pdb pacts cdb =
     SomeServer (Proxy @(RosettaApi vT)) $ rosettaServer v ps ms pdb cdb pacts
 
 --------------------------------------------------------------------------------
@@ -177,7 +177,7 @@ blockH v cutDb ps pacts (BlockReq net (PartialBlockId bheight bhash)) =
       bh <- findBlockHeaderInCurrFork cutDb cid bheight bhash
       (coinbase, txs) <- getBlockOutputs payloadDb bh
       logs <- getTxLogs pact bh
-      trans <- matchLogs FullLogs bh logs coinbase txs
+      trans <- matchLogs v FullLogs bh logs coinbase txs
       pure $ BlockResp
         { _blockResp_block = Just $ block bh trans
         , _blockResp_otherTransactions = Nothing
@@ -207,7 +207,7 @@ blockTransactionH v cutDb ps pacts (BlockTransactionReq net bid t) = do
       rkTarget <- hush (fromText' rtid) ?? RosettaUnparsableTransactionId
       (coinbase, txs) <- getBlockOutputs payloadDb bh
       logs <- getTxLogs pact bh
-      tran <- matchLogs (SingleLog rkTarget) bh logs coinbase txs
+      tran <- matchLogs v (SingleLog rkTarget) bh logs coinbase txs
 
       pure $ BlockTransactionResp tran
 
@@ -246,7 +246,7 @@ constructionPreprocessH v req = do
     either throwRosettaError pure work
   where
     ConstructionPreprocessReq net ops someMeta someMaxFee someMult = req
-    
+
     work :: Either RosettaError ConstructionPreprocessResp
     work = do
       _ <- annotate rosettaError' (validateNetwork v net)
@@ -286,7 +286,7 @@ constructionMetadataH
 constructionMetadataH v cutDb pacts (ConstructionMetadataReq net opts someKeys) =
     runExceptT work >>= either throwRosettaError pure
   where
-    
+
     work :: ExceptT RosettaError Handler ConstructionMetadataResp
     work = do
       cid <- hoistEither $ annotate rosettaError' (validateNetwork v net)
@@ -302,7 +302,7 @@ constructionMetadataH v cutDb pacts (ConstructionMetadataReq net opts someKeys) 
       expectedAccts <- toSignerAcctsMap tx payer cid pacts cutDb
       signersAndAccts <- hoistEither $!
                          createSigners availableSigners expectedAccts
-      
+
       pure $! ConstructionMetadataResp
         { _constructionMetadataResp_metadata = toObject $! PayloadsMetaData
             { _payloadsMetaData_signers = signersAndAccts
@@ -425,7 +425,7 @@ constructionSubmitH v ms (ConstructionSubmitReq net tx) =
       $ "Validation failed for hash "
       ++ (show $! hsh) ++ ": "
       ++ show insErr
-    
+
     work :: ExceptT RosettaError Handler TransactionIdResp
     work = do
         cid <- hoistEither $ annotate rosettaError' (validateNetwork v net)
@@ -578,7 +578,7 @@ networkStatusH v cutDb peerDb (NetworkReq nid _) =
     work = do
         cid <- hoistEither $ validateNetwork v nid
         bh <- getLatestBlockHeader cutDb cid
-        let genesisBh = genesisBlockHeader v cid
+        let genesisBh = genesisBlockHeader (chainwebVersionTag v) cid
         peers <- lift $ _pageItems <$>
           peerGetHandler
           peerDb

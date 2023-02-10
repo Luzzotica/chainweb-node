@@ -57,7 +57,7 @@ data SomeMempool t = forall v c
     . (KnownChainwebVersionSymbol v, KnownChainIdSymbol c)
     => SomeMempool (Mempool_ v c t)
 
-someMempoolVal :: ChainwebVersion -> ChainId -> MempoolBackend t -> SomeMempool t
+someMempoolVal :: ChainwebVersionName -> ChainId -> MempoolBackend t -> SomeMempool t
 someMempoolVal v cid m =
    case someChainwebVersionVal v of
      (SomeChainwebVersionT (Proxy :: Proxy vt)) -> case someChainIdVal cid of

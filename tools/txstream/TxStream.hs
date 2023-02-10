@@ -91,7 +91,7 @@ testLogfun _ = T.putStrLn . logText
 data Config = Config
     { _configLogHandle :: !Y.LoggerHandleConfig
     , _configLogLevel :: !Y.LogLevel
-    , _configChainwebVersion :: !ChainwebVersion
+    , _configChainwebVersion :: !ChainwebVersionTag
     , _configChainId :: !ChainId
     , _configNode :: !HostAddress
     , _configPretty :: !Bool
@@ -105,14 +105,14 @@ defaultConfig :: Config
 defaultConfig = Config
     { _configLogHandle = Y.StdOut
     , _configLogLevel = Y.Info
-    , _configChainwebVersion = Development
+    , _configChainwebVersion = devVersion
     , _configChainId = someChainId devVersion
     , _configNode = HostAddress (unsafeHostnameFromText "us1.tn1.chainweb.com") 443
     , _configPretty = True
     , _configOutputs = True
     }
   where
-    devVersion = Development
+    devVersion = Development ()
 
 instance ToJSON Config where
     toJSON o = object
@@ -182,6 +182,7 @@ devNetDb c mgr l = mkDb
 
 mkDb
     :: HasChainwebVersion v
+    => (DevConfig v ~ ())
     => HasChainId cid
     => v
     -> cid

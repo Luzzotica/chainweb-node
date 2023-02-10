@@ -67,7 +67,7 @@ import System.IO.Unsafe (unsafePerformIO)
 -- -------------------------------------------------------------------------- --
 -- Global Settings
 
-v :: ChainwebVersion
+v :: ChainwebVersion dc
 v = FastTimedCPM petersonChainGraph
 
 nodes :: Natural

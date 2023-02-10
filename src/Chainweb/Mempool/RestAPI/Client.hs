@@ -46,7 +46,7 @@ import Chainweb.Version
 -- TODO: all of these operations need timeout support.
 toMempool
     :: (Show t, NFData t)
-    => ChainwebVersion
+    => ChainwebVersionName
     -> ChainId
     -> TransactionConfig t
     -> ClientEnv
@@ -93,7 +93,7 @@ insertClient_ = client (mempoolInsertApi @v @c)
 
 insertClient
     :: TransactionConfig t
-    -> ChainwebVersion
+    -> ChainwebVersionName
     -> ChainId
     -> [t]
     -> ClientM NoContent
@@ -113,7 +113,7 @@ memberClient_
 memberClient_ = client (mempoolMemberApi @v @c)
 
 memberClient
-  :: ChainwebVersion
+  :: ChainwebVersionName
   -> ChainId
   -> [TransactionHash]
   -> ClientM [Bool]
@@ -133,7 +133,7 @@ lookupClient_ = client (mempoolLookupApi @v @c)
 
 lookupClient
   :: TransactionConfig t
-  -> ChainwebVersion
+  -> ChainwebVersionName
   -> ChainId
   -> [TransactionHash]
   -> ClientM [LookupResult t]
@@ -160,7 +160,7 @@ getPendingClient_
 getPendingClient_ = client (mempoolGetPendingApi @v @c)
 
 getPendingClient
-  :: ChainwebVersion
+  :: ChainwebVersionName
   -> ChainId
   -> Maybe (ServerNonce, MempoolTxId)
   -> ClientM PendingTransactions

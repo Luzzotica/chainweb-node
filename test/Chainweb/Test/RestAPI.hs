@@ -41,7 +41,6 @@ import Text.Read (readEither)
 -- internal modules
 
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis (genesisBlockHeader)
 import Chainweb.BlockHeaderDB
 import Chainweb.BlockHeaderDB.Internal (unsafeInsertBlockHeaderDb)
 import Chainweb.ChainId
@@ -80,7 +79,7 @@ genesisBh db = head <$> headers db
 missingKey :: MonadIO m => BlockHeaderDb -> m (DbKey BlockHeaderDb)
 missingKey db = key
     . head
-    . testBlockHeadersWithNonce (Nonce 34523)
+    . testBlockHeadersWithNonce (_chainwebVersion db) (Nonce 34523)
     . ParentHeader
     <$> genesisBh db
 
@@ -203,7 +202,7 @@ simpleClientSession envIO cid =
             (Actual gen1)
 
         void $ liftIO $ step "put 3 new blocks"
-        let newHeaders = take 3 $ testBlockHeaders (ParentHeader gbh0)
+        let newHeaders = take 3 $ testBlockHeaders (_chainwebVersion db) (ParentHeader gbh0)
         liftIO $ traverse_ (unsafeInsertBlockHeaderDb db) newHeaders
 
         void $ liftIO $ step "headersClient: get all 4 block headers"
@@ -311,7 +310,7 @@ simpleClientSession envIO cid =
         -- branch hashes with fork
 
         void $ liftIO $ step "headerPutClient: put 3 new blocks on a new fork"
-        let newHeaders2 = take 3 $ testBlockHeadersWithNonce (Nonce 17) (ParentHeader gbh0)
+        let newHeaders2 = take 3 $ testBlockHeadersWithNonce (_chainwebVersion db) (Nonce 17) (ParentHeader gbh0)
         liftIO $ traverse_ (unsafeInsertBlockHeaderDb db) newHeaders2
 
         let lower = last newHeaders
@@ -420,9 +419,9 @@ pagingTest name getDbItems getKey fin request envIO = testGroup name
 testPageLimitHeadersClient :: ChainwebVersion -> IO TestClientEnv_ -> TestTree
 testPageLimitHeadersClient version = pagingTest "headersClient" headers key False request
   where
-    request cid l n = headersClient version cid l n Nothing Nothing
+    request cid l n = headersClient (chainwebVersionTag version) cid l n Nothing Nothing
 
 testPageLimitHashesClient :: ChainwebVersion -> IO TestClientEnv_ -> TestTree
 testPageLimitHashesClient version = pagingTest "hashesClient" hashes id False request
   where
-    request cid l n = hashesClient version cid l n Nothing Nothing
+    request cid l n = hashesClient (chainwebVersionTag version) cid l n Nothing Nothing

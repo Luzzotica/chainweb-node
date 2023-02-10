@@ -121,7 +121,7 @@ checkReachability sock mgr v logger pdb peers peer threshold = do
     logg = logFunctionText logger
 
     run p = runClientM
-        (peerPutClient v CutNetwork pinf)
+        (peerPutClient (chainwebVersionTag v) CutNetwork pinf)
         (peerInfoClientEnv mgr p)
 
     withPeerDbServer inner = withAsync servePeerDb $ const inner

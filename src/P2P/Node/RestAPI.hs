@@ -96,12 +96,12 @@ p2pApi = Proxy
 -- -------------------------------------------------------------------------- --
 -- Mulit Chain API
 
-someP2pApi :: ChainwebVersion -> NetworkId -> SomeApi
+someP2pApi :: ChainwebVersionName -> NetworkId -> SomeApi
 someP2pApi (FromSingChainwebVersion (SChainwebVersion :: Sing v)) = f
   where
     f (FromSingNetworkId (SChainNetwork SChainId :: Sing n)) = SomeApi $ p2pApi @v @n
     f (FromSingNetworkId (SMempoolNetwork SChainId :: Sing n)) = SomeApi $ p2pApi @v @n
     f (FromSingNetworkId (SCutNetwork :: Sing n)) = SomeApi $ p2pApi @v @n
 
-someP2pApis :: ChainwebVersion -> [NetworkId] -> SomeApi
+someP2pApis :: ChainwebVersionName -> [NetworkId] -> SomeApi
 someP2pApis v = mconcat . fmap (someP2pApi v)

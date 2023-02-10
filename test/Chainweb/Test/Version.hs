@@ -49,7 +49,7 @@ propForVersions desc prop = testGroup desc
     [ testProperty "arbitrary versions" $ prop
     , testProperty "mainnet" $ prop Mainnet01
     , testProperty "testnet" $ prop Testnet04
-    , testProperty "devnet" $ prop Development
+    , testProperty "devnet" $ prop (Development defaultDevVersionConfig)
     ]
 
 -- -------------------------------------------------------------------------- --

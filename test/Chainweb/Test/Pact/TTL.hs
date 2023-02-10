@@ -28,7 +28,6 @@ import Test.Tasty.HUnit
 
 import Chainweb.BlockCreationTime
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis
 import Chainweb.BlockHeaderDB hiding (withBlockHeaderDb)
 import Chainweb.BlockHeaderDB.Internal (unsafeInsertBlockHeaderDb)
 import Chainweb.Miner.Pact
@@ -52,7 +51,7 @@ import Chainweb.Storage.Table.RocksDB
 -- -------------------------------------------------------------------------- --
 -- Settings
 
-testVer :: ChainwebVersion
+testVer :: ChainwebVersion dc
 testVer = FastTimedCPM peterson
 
 genblock :: BlockHeader
@@ -225,6 +224,7 @@ doNewBlock ctxIO mempool parent nonce t = do
      payload <- assertNotLeft =<< takeMVar mv
 
      let bh = newBlockHeader
+              testVer
               mempty
               (_payloadWithOutputsPayloadHash payload)
               nonce

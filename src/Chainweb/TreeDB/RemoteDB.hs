@@ -39,11 +39,11 @@ import System.LogLevel
 import Chainweb.BlockHash (BlockHash)
 import Chainweb.BlockHeader (BlockHeader(..))
 import Chainweb.BlockHeaderDB.RestAPI.Client
-import Chainweb.ChainId (ChainId)
+import Chainweb.ChainId
 import Chainweb.TreeDB
 import Chainweb.Utils
 import Chainweb.Utils.Paging
-import Chainweb.Version (ChainwebVersion)
+import Chainweb.Version
 
 import Data.LogMessage
 
@@ -53,7 +53,7 @@ import Data.LogMessage
 data RemoteDb = RemoteDb
     { _remoteEnv :: !ClientEnv
     , _remoteLogFunction :: !ALogFunction
-    , _remoteVersion :: !ChainwebVersion
+    , _remoteVersion :: !ChainwebVersionName
     , _remoteChainId :: {-# UNPACK #-} !ChainId
     }
 
@@ -137,4 +137,4 @@ remoteDb
     -> IO RemoteDb
 remoteDb db logg env = do
     h <- root db
-    pure $! RemoteDb env (ALogFunction logg) (_blockChainwebVersion h) (_blockChainId h)
+    pure $! RemoteDb env (ALogFunction logg) (_versionName $ _blockChainwebVersion h) (_blockChainId h)

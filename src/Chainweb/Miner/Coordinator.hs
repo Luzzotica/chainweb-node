@@ -67,6 +67,7 @@ import System.LogLevel (LogLevel(..))
 import Chainweb.BlockCreationTime
 import Chainweb.BlockHash
 import Chainweb.BlockHeader
+import Chainweb.ChainId
 import Chainweb.Cut hiding (join)
 import Chainweb.Cut.Create
 import Chainweb.Cut.CutHashes
@@ -197,7 +198,7 @@ newWork logFun choice eminer@(Miner mid _) hdb pact tpw c = do
         Just (T2 (payload, primedParentHash) extension)
             | primedParentHash == _blockHash (_parentHeader (_cutExtensionParent extension)) -> do
                 let !phash = _payloadDataPayloadHash payload
-                !wh <- newWorkHeader hdb extension phash
+                !wh <- newWorkHeader (_chainwebVersion hdb) hdb extension phash
                 pure $ Just $ T2 wh payload
             | otherwise -> do
 

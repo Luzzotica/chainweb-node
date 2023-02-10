@@ -59,8 +59,8 @@ mkTestBlockDb cv rdb = do
     testRdb <- testRocksDb "mkTestBlockDb" rdb
     wdb <- initWebBlockHeaderDb testRdb cv
     let pdb = newPayloadDb testRdb
-    initializePayloadDb cv pdb
-    initCut <- newMVar $ genesisCut cv
+    initializePayloadDb (chainwebVersionTag cv) pdb
+    initCut <- newMVar $ genesisCut (chainwebVersionTag cv)
     return $! TestBlockDb wdb pdb initCut
 
 -- | Add a block.

@@ -90,9 +90,9 @@ instance Exception ChainIdException
 
 -- | ChainId /within the context of a Chainweb instance/.
 --
--- The set of valid ChainIds is determined by the 'ChainwebVersion'. In almost
+-- The set of valid ChainIds is determined by the 'ChainwebVersionTag. In almost
 -- all use cases there should be a context that is an instance of
--- 'HasChainwebVersion' can be used get the set of chain ids.
+-- 'HasChainwebVersionTag can be used get the set of chain ids.
 --
 -- In the context of a particular chain the respective 'ChainId' can be obtained
 -- via instances of 'HasChainId'.

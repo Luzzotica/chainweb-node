@@ -65,10 +65,10 @@ import Pact.Types.PactValue
 import Pact.Types.Persistence
 import Pact.Types.Pretty
 
-testVersion :: ChainwebVersion
+testVersion :: ChainwebVersion dc
 testVersion = FastTimedCPM petersonChainGraph
 
-testEventsVersion :: ChainwebVersion
+testEventsVersion :: ChainwebVersion dc
 testEventsVersion = FastTimedCPM singletonChainGraph
 
 tests :: ScheduledTest
@@ -115,7 +115,7 @@ tests = ScheduledTest label $
     bhdbIO rocksIO = do
         rdb <- rocksIO
         let genesisHeader = genesisBlockHeader testVersion cid
-        testBlockHeaderDb rdb genesisHeader
+        testBlockHeaderDb rdb testVersion genesisHeader
 
     label = "Chainweb.Test.Pact.PactExec"
     killPdb _ = return ()

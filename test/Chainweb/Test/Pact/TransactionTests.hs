@@ -68,7 +68,7 @@ import Chainweb.Test.Pact.Utils
 -- Global settings
 
 v :: ChainwebVersion
-v = Development
+v = Development defaultDevVersionConfig
 
 coinReplV1 :: FilePath
 coinReplV1 = "pact/coin-contract/coin.repl"
@@ -247,7 +247,7 @@ testCoinbase797DateFix = testCaseSteps "testCoinbase791Fix" $ \step -> do
 
   where
     doCoinbaseExploit pdb mc height localCmd precompile testResult = do
-      let ctx = TxContext (mkTestParentHeader $ height - 1) def
+      let ctx = TxContext (mkTestParentHeader $ height - 1) def v
 
       void $ applyCoinbase Mainnet01 logger pdb miner 0.1 ctx
         (EnforceCoinbaseFailure True) (CoinbaseUsePrecompiled precompile) mc
@@ -280,7 +280,7 @@ testCoinbase797DateFix = testCaseSteps "testCoinbase791Fix" $ \step -> do
 testCoinbaseEnforceFailure :: Assertion
 testCoinbaseEnforceFailure = do
     (pdb,mc) <- loadCC coinReplV4
-    r <- tryAllSynchronous $ applyCoinbase toyVersion logger pdb badMiner 0.1 (TxContext someParentHeader def)
+    r <- tryAllSynchronous $ applyCoinbase toyVersion logger pdb badMiner 0.1 (TxContext someParentHeader def v)
       (EnforceCoinbaseFailure True) (CoinbaseUsePrecompiled False) mc
     case r of
       Left e ->
@@ -356,7 +356,7 @@ testUpgradeScript
     -> IO ()
 testUpgradeScript script cid bh test = do
     (pdb, mc) <- loadScript script
-    r <- tryAllSynchronous $ applyCoinbase v logger pdb noMiner 0.1 (TxContext p def)
+    r <- tryAllSynchronous $ applyCoinbase v logger pdb noMiner 0.1 (TxContext p def v)
         (EnforceCoinbaseFailure True) (CoinbaseUsePrecompiled False) mc
     case r of
       Left e -> assertFailure $ "tx execution failed: " ++ show e
@@ -382,7 +382,7 @@ matchLogs expectedResults actualResults
 
 parent :: BlockHeight -> V.ChainId -> ParentHeader
 parent bh cid = ParentHeader $ (someBlockHeader v bh)
-    { _blockChainwebVersion = v
+    { _blockChainwebVersion = chainwebVersionTag v
     , _blockChainId = cid
     , _blockHeight = pred bh
     }

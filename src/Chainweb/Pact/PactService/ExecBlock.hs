@@ -70,6 +70,8 @@ import qualified Pact.Types.SPV as P
 
 import Chainweb.BlockHeader
 import Chainweb.BlockHeight
+import Chainweb.ChainId
+import Chainweb.Graph
 import Chainweb.Mempool.Mempool as Mempool
 import Chainweb.Miner.Pact
 import Chainweb.Pact.Backend.Types
@@ -117,8 +119,10 @@ execBlock currHeader plData pdbenv = do
     unlessM ((> 0) <$> asks _psCheckpointerDepth) $ do
         error $ "Code invariant violation: execBlock must be called with withCheckpointer. Please report this as a bug."
 
+    v <- view psVersion
     miner <- decodeStrictOrThrow' (_minerData $ _payloadDataMiner plData)
-    trans <- liftIO $ transactionsFromPayload (Just (v, _blockHeight currHeader)) plData
+    trans <-
+        liftIO $ transactionsFromPayload (pactParserVersion v (_blockChainId currHeader) (_blockHeight currHeader)) plData
     cp <- getCheckpointer
     logger <- view psLogger
 
@@ -144,7 +148,7 @@ execBlock currHeader plData pdbenv = do
 
     logInitCache
 
-    !results <- go miner trans >>= throwOnGasFailure
+    !results <- go v miner trans >>= throwOnGasFailure
 
     modify' $ set psStateValidated $ Just currHeader
 
@@ -156,8 +160,8 @@ execBlock currHeader plData pdbenv = do
     return $! T2 miner results
 
   where
-    blockGasLimit =
-      fromIntegral <$> maxBlockGasLimit v (_blockChainId currHeader) (_blockHeight currHeader)
+    blockGasLimit v =
+      fromIntegral <$> maxBlockGasLimit v (_blockHeight currHeader)
 
     logInitCache = do
       mc <- fmap (fmap instr) <$> use psInitCache
@@ -168,20 +172,19 @@ execBlock currHeader plData pdbenv = do
     handleValids (tx,Left e) es = (P._cmdHash tx, sshow e):es
     handleValids _ es = es
 
-    v = _chainwebVersion currHeader
     cid = _chainId currHeader
 
     isGenesisBlock = isGenesisBlockHeader currHeader
 
-    go m txs = if isGenesisBlock
+    go v m txs = if isGenesisBlock
       then do
         -- GENESIS VALIDATE COINBASE: Reject bad coinbase, use date rule for precompilation
         execTransactions True m txs
-          (EnforceCoinbaseFailure True) (CoinbaseUsePrecompiled False) pdbenv blockGasLimit Nothing
+          (EnforceCoinbaseFailure True) (CoinbaseUsePrecompiled False) pdbenv (blockGasLimit v) Nothing
       else do
         -- VALIDATE COINBASE: back-compat allow failures, use date rule for precompilation
         execTransactions False m txs
-          (EnforceCoinbaseFailure False) (CoinbaseUsePrecompiled False) pdbenv blockGasLimit Nothing
+          (EnforceCoinbaseFailure False) (CoinbaseUsePrecompiled False) pdbenv (blockGasLimit v) Nothing
 
 throwOnGasFailure
     :: Transactions (Either GasPurchaseFailure a)
@@ -220,7 +223,7 @@ validateChainwebTxs logger v cid cp txValidationTime bh txs doBuyGas
       >>= runValid checkTxHash
       >>= runValid checkTxSigs
       >>= runValid checkTimes
-      >>= runValid (return . checkCompile v bh)
+      >>= runValid (return . checkCompile v cid bh)
 
     checkUnique :: ChainwebTransaction -> IO (Either InsertError ChainwebTransaction)
     checkUnique t = do
@@ -249,9 +252,9 @@ validateChainwebTxs logger v cid cp txValidationTime bh txs doBuyGas
     checkTxSigs t = case validateSigs t of
         Left _
             -- special case for old testnet history
-            | v == Testnet04 && not (doCheckTxHash v bh) -> do
-                P.logLog logger "DEBUG" "ignored legacy invalid signature"
-                return $ Right t
+            -- | v == Testnet04 && not (doCheckTxHash v bh) -> do
+            --     P.logLog logger "DEBUG" "ignored legacy invalid signature"
+            --     return $ Right t
             | otherwise -> return $ Left $ InsertErrorInvalidSigs
         Right _ -> pure $ Right t
 
@@ -283,10 +286,11 @@ type RunGas = ValidateTxs -> IO ValidateTxs
 
 checkCompile
   :: ChainwebVersion
+  -> ChainId
   -> BlockHeight
   -> ChainwebTransaction
   -> Either InsertError ChainwebTransaction
-checkCompile v bh tx = case payload of
+checkCompile v cid bh tx = case payload of
   Exec (ExecMsg parsedCode _) ->
     case compileCode parsedCode of
       Left perr -> Left $ InsertErrorCompilationFailed (sshow perr)
@@ -295,7 +299,7 @@ checkCompile v bh tx = case payload of
   where
     payload = P._pPayload $ payloadObj $ P._cmdPayload tx
     compileCode p =
-      let e = ParseEnv (chainweb216Pact After v bh)
+      let e = ParseEnv (afterFork Chainweb216Pact v cid bh)
       in compileExps e (mkTextInfo (P._pcCode p)) (P._pcExps p)
 
 skipDebitGas :: RunGas
@@ -461,10 +465,10 @@ toHashCommandResult :: P.CommandResult [P.TxLog A.Value] -> P.CommandResult P.Ha
 toHashCommandResult = over (P.crLogs . _Just) $ P.pactHash . encodeToByteString
 
 transactionsFromPayload
-    :: Maybe (ChainwebVersion, BlockHeight)
+    :: PactParserVersion
     -> PayloadData
     -> IO (Vector ChainwebTransaction)
-transactionsFromPayload chainCtx plData = do
+transactionsFromPayload ppv plData = do
     vtrans <- fmap V.fromList $
               mapM toCWTransaction $
               toList (_payloadDataTransactions plData)
@@ -475,7 +479,7 @@ transactionsFromPayload chainCtx plData = do
             <> T.intercalate ". " ls
     return $! V.fromList theRights
   where
-    toCWTransaction bs = evaluate (force (codecDecode (chainwebPayloadCodec chainCtx) $
+    toCWTransaction bs = evaluate (force (codecDecode (chainwebPayloadCodec ppv) $
                                           _transactionBytes bs))
 
 debugResult :: A.ToJSON a => Text -> a -> PactServiceM tbl ()

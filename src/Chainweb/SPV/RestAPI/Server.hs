@@ -146,7 +146,7 @@ someSpvServer (SomeCutDb (db :: CutDbT tbl v))
 
 someSpvServers
     :: CanReadablePayloadCas tbl
-    => ChainwebVersion
+    => ChainwebVersionName
     -> CutDb tbl
     -> SomeServer
 someSpvServers v db = mconcat $ flip fmap cids $ \(FromSingChainId (SChainId :: Sing c)) ->

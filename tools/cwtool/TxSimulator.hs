@@ -96,7 +96,7 @@ simulate sc@(SimConfig dbDir txIdx' _ _ cid ver) = do
             Left _ -> error "bad cmd"
             Right cmdPwt -> do
               let cmd = payloadObj <$> cmdPwt
-                  txc = txContext parent cmd
+                  txc = txContext parent cmd ver
               PactDbEnv' pde <-
                 _cpRestore cp $ Just (succ (_blockHeight parent), _blockHash parent)
               mc <- readInitModules logger pde txc
@@ -113,8 +113,6 @@ simulate sc@(SimConfig dbDir txIdx' _ _ cid ver) = do
                         ver True False logger gasLogger (pactLoggers cwLogger) False 1 defaultBlockGasLimit
                   pss = PactServiceState Nothing mempty (ParentHeader parent) noSPVSupport
               evalPactServiceM pss pse $ doBlock True parent (zip hdrs pwos)
-
-
 
 
   where
@@ -138,7 +136,7 @@ simulate sc@(SimConfig dbDir txIdx' _ _ cid ver) = do
       pde'@(PactDbEnv' pde) <-
           liftIO $ _cpRestore cp $ Just (succ (_blockHeight parent), _blockHash parent)
       when initMC $ do
-        mc <- liftIO $ readInitModules logger pde (TxContext (ParentHeader parent) def)
+        mc <- liftIO $ readInitModules logger pde (TxContext (ParentHeader parent) def ver)
         updateInitCache mc
       psParentHeader .= ParentHeader parent
       liftIO (spvSim sc hdr pwo) >>= assign psSpvSupport
@@ -188,7 +186,7 @@ setupClient sc = flip mkClientEnv (scApiHostUrl sc) <$> newTlsManagerWith mgrSet
 fetchHeaders :: SimConfig -> ClientEnv -> IO [BlockHeader]
 fetchHeaders sc cenv = do
   r <- (`runClientM` cenv) $
-      headersClient (scVersion sc) (scChain sc) Nothing Nothing
+      headersClient (scVersion sc & versionConfig .~ ()) (scChain sc) Nothing Nothing
       (Just $ fromIntegral $ pred $ fst $ scRange sc)
       (Just $ fromIntegral $ snd $ scRange sc)
   case r of
@@ -198,7 +196,7 @@ fetchHeaders sc cenv = do
 fetchOutputs :: SimConfig -> ClientEnv -> [BlockHeader] -> IO [PayloadWithOutputs]
 fetchOutputs sc cenv bhs = do
   r <- (`runClientM` cenv) $ do
-    outputsBatchClient (scVersion sc) (scChain sc) (map _blockPayloadHash bhs)
+    outputsBatchClient (scVersion sc & versionConfig .~ ()) (scChain sc) (map _blockPayloadHash bhs)
   case r of
     Left e -> throwM e
     Right ps -> return ps
@@ -210,7 +208,7 @@ simulateMain = do
     cc <- chainIdFromText (T.pack c)
     u <- parseBaseUrl h
     let rng = (fromIntegral @Integer s,fromIntegral @Integer (fromMaybe s e))
-    simulate $ SimConfig d i u rng cc vv
+    simulate $ SimConfig d i u rng cc (vv & versionConfig .~ error "no dev version config")
   where
     opts = info (parser <**> helper)
         (fullDesc <> progDesc "Single Transaction simulator")
@@ -239,8 +237,8 @@ simulateMain = do
              (short 'c'
               <> metavar "CHAIN"
               <> help "Chain ID"))
-        <*> (fromMaybe (show Mainnet01) <$> optional (strOption
+        <*> (fromMaybe (show (Mainnet01 @())) <$> optional (strOption
              (short 'v'
               <> metavar "VERSION"
               <> help ("Chainweb version, default is "
-                       ++ show Mainnet01))))
+                       ++ show (Mainnet01 @())))))

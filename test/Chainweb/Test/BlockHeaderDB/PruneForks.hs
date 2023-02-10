@@ -76,7 +76,7 @@ withDbs rio inner = do
     let pdb = newPayloadDb rdb
     initializePayloadDb toyVersion pdb
     bracket
-        (initBlockHeaderDb (Configuration h rdb))
+        (initBlockHeaderDb (Configuration h rdb toyVersion))
         closeBlockHeaderDb
         (\bdb -> inner rdb bdb pdb h)
   where
@@ -274,7 +274,7 @@ failIntrinsicCheck rio checks n step = withDbs rio $ \rdb bdb pdb h -> do
     (f0, _) <- createForks bdb pdb h
     let b = f0 !! int n
     delHdr bdb b
-    unsafeInsertBlockHeaderDb bdb $ b { _blockChainwebVersion = Development }
+    unsafeInsertBlockHeaderDb bdb $ b { _blockChainwebVersion = Development () }
     try (pruneAllChains logger rdb toyVersion checks) >>= \case
         Left e
             | CheckFull `elem` checks

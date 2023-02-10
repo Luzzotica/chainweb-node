@@ -821,14 +821,14 @@ member db cid h = do
 -- -------------------------------------------------------------------------- --
 -- Some CutDB
 
--- | 'CutDb' with type level 'ChainwebVersion'
+-- | 'CutDb' with type level 'ChainwebVersionTag
 --
 newtype CutDbT tbl (v :: ChainwebVersionT) = CutDbT (CutDb tbl)
     deriving (Generic)
 
 data SomeCutDb tbl = forall v . KnownChainwebVersionSymbol v => SomeCutDb (CutDbT tbl v)
 
-someCutDbVal :: ChainwebVersion -> CutDb tbl -> SomeCutDb tbl
+someCutDbVal :: ChainwebVersionName -> CutDb tbl -> SomeCutDb tbl
 someCutDbVal (FromSingChainwebVersion (SChainwebVersion :: Sing v)) db = SomeCutDb $ CutDbT @_ @v db
 
 -- -------------------------------------------------------------------------- --

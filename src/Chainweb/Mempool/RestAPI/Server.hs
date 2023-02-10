@@ -112,7 +112,7 @@ handleErrs = flip catchAllSynchronous $ \e ->
 
 someMempoolServer
     :: (Show t)
-    => ChainwebVersion
+    => ChainwebVersionName
     -> SomeMempool t
     -> SomeServer
 someMempoolServer ver (SomeMempool (mempool :: Mempool_ v c t))
@@ -121,12 +121,12 @@ someMempoolServer ver (SomeMempool (mempool :: Mempool_ v c t))
 
 someMempoolServers
     :: (Show t)
-    => ChainwebVersion -> [(ChainId, MempoolBackend t)] -> SomeServer
+    => ChainwebVersionName -> [(ChainId, MempoolBackend t)] -> SomeServer
 someMempoolServers v = mconcat
     . fmap (someMempoolServer v . uncurry (someMempoolVal v))
 
 
-mempoolServer :: Show t => ChainwebVersion -> Mempool_ v c t -> Server (MempoolApi v c)
+mempoolServer :: Show t => ChainwebVersionName -> Mempool_ v c t -> Server (MempoolApi v c)
 mempoolServer _v (Mempool_ mempool) =
     insertHandler mempool
     :<|> memberHandler mempool

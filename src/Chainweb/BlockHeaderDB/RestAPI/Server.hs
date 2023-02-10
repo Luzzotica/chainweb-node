@@ -73,7 +73,7 @@ import Chainweb.TreeDB
 import Chainweb.Utils.Paging
 import Chainweb.Version
 
-import Chainweb.Storage.Table 
+import Chainweb.Storage.Table
 
 -- -------------------------------------------------------------------------- --
 -- Handler Tools
@@ -277,7 +277,7 @@ someBlockHeaderDbServers v = mconcat
 -- -------------------------------------------------------------------------- --
 -- BlockHeader Event Stream
 
-someHeaderStreamServer :: CanReadablePayloadCas tbl => ChainwebVersion -> CutDb tbl -> SomeServer
+someHeaderStreamServer :: CanReadablePayloadCas tbl => ChainwebVersionName -> CutDb tbl -> SomeServer
 someHeaderStreamServer (FromSingChainwebVersion (SChainwebVersion :: Sing v)) cdb =
     SomeServer (Proxy @(HeaderStreamApi v)) $ headerStreamServer cdb
 

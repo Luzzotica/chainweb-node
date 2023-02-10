@@ -59,6 +59,7 @@ import Chainweb.BlockHash
 import Chainweb.BlockHeader
 import Chainweb.BlockHeaderDB (BlockHeaderDb)
 import Chainweb.BlockHeaderDB.RestAPI
+import Chainweb.ChainId
 import Chainweb.RestAPI.Orphans ()
 import Chainweb.RestAPI.Utils
 import Chainweb.TreeDB
@@ -77,7 +78,7 @@ headerClient_
 headerClient_ = headerClientContentType_ @v @c @JSON
 
 headerClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> DbKey BlockHeaderDb
     -> ClientM BlockHeader
@@ -95,7 +96,7 @@ headerClientContentType_
 headerClientContentType_ = client (Proxy @(SetRespBodyContentType ct x))
 
 headerClientJson
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> DbKey BlockHeaderDb
     -> ClientM BlockHeader
@@ -105,7 +106,7 @@ headerClientJson v c k = runIdentity $ do
     return $ headerClientContentType_ @v @c @JSON k
 
 headerClientJsonPretty
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> BlockHash
     -> ClientM BlockHeader
@@ -115,7 +116,7 @@ headerClientJsonPretty v c k = runIdentity $ do
     return $ headerClientContentType_ @v @c @JsonBlockHeaderObject k
 
 headerClientJsonBinary
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> BlockHash
     -> ClientM BlockHeader
@@ -139,7 +140,7 @@ headersClient_
 headersClient_ = headersClientContentType_ @v @c @JSON
 
 headersClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
         -- ^ The remote chainweb that you wish to query from.
     -> ChainId
         -- ^ The remote chain within the web that you wish to query from.
@@ -171,7 +172,7 @@ headersClientContentType_
 headersClientContentType_ = client $ Proxy @(SetRespBodyContentType ct (HeadersApi v c))
 
 headersClientJson
-    :: ChainwebVersion
+    :: ChainwebVersionName
         -- ^ The remote chainweb that you wish to query from.
     -> ChainId
         -- ^ The remote chain within the web that you wish to query from.
@@ -192,7 +193,7 @@ headersClientJson v c limit start minr maxr = runIdentity $ do
     return $ headersClientContentType_ @v @c @JSON limit start minr maxr
 
 headersClientJsonPretty
-    :: ChainwebVersion
+    :: ChainwebVersionName
         -- ^ The remote chainweb that you wish to query from.
     -> ChainId
         -- ^ The remote chain within the web that you wish to query from.
@@ -228,7 +229,7 @@ branchHashesClient_
 branchHashesClient_ = client (branchHashesApi @v @c)
 
 branchHashesClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)
@@ -257,7 +258,7 @@ branchHeadersClient_
 branchHeadersClient_ = branchHeadersClientContentType_ @v @c @JSON
 
 branchHeadersClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)
@@ -283,7 +284,7 @@ branchHeadersClientContentType_ = client
     $ Proxy @(SetRespBodyContentType ct (BranchHeadersApi v c))
 
 branchHeadersClientJson
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)
@@ -297,7 +298,7 @@ branchHeadersClientJson v c limit start minr maxr bounds = runIdentity $ do
     return $ branchHeadersClientContentType_ @v @c @JSON limit start minr maxr bounds
 
 branchHeadersClientJsonPretty
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)
@@ -325,7 +326,7 @@ hashesClient_
 hashesClient_ = client (hashesApi @v @c)
 
 hashesClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> Maybe Limit
     -> Maybe (NextItem BlockHash)

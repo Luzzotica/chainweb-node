@@ -213,7 +213,7 @@ getHost
     -> IO (Either T.Text Hostname)
 getHost mgr ver logger peers = do
     nis <- forConcurrently peers $ \p ->
-        tryAllSynchronous (requestRemoteNodeInfo mgr ver (_peerAddr p) Nothing) >>= \case
+        tryAllSynchronous (requestRemoteNodeInfo mgr (chainwebVersionTag ver) (_peerAddr p) Nothing) >>= \case
             Right x -> Just x <$ do
                 logFunctionText logger Info
                     $ "got remote info from " <> toText (_peerAddr p)

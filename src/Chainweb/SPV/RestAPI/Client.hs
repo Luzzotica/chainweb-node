@@ -58,7 +58,7 @@ spvGetTransactionProofClient_
 spvGetTransactionProofClient_ = client (spvGetTransactionProofApi @v @c)
 
 spvGetTransactionProofClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
         -- ^ the target chain of the proof. This is the chain for which
         -- inclusion is proved.
@@ -98,7 +98,7 @@ spvGetTransactionOutputProofClient_
 spvGetTransactionOutputProofClient_ = client (spvGetTransactionOutputProofApi @v @c)
 
 spvGetTransactionOutputProofClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
         -- ^ the target chain of the proof. This is the chain for which inclusion
         -- is proved.

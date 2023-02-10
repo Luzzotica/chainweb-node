@@ -257,18 +257,20 @@ readFile' fp = withFile fp ReadMode $ \h -> do
 
 testBlockHeaderDb
     :: RocksDb
+    -> ChainwebVersion
     -> BlockHeader
     -> IO BlockHeaderDb
-testBlockHeaderDb rdb h = do
+testBlockHeaderDb rdb v h = do
     rdb' <- testRocksDb "withTestBlockHeaderDb" rdb
-    initBlockHeaderDb (Configuration h rdb')
+    initBlockHeaderDb (Configuration h rdb' v)
 
 withTestBlockHeaderDb
     :: RocksDb
+    -> ChainwebVersion
     -> BlockHeader
     -> (BlockHeaderDb -> IO a)
     -> IO a
-withTestBlockHeaderDb rdb h = bracket (testBlockHeaderDb rdb h) closeBlockHeaderDb
+withTestBlockHeaderDb rdb v h = bracket (testBlockHeaderDb rdb v h) closeBlockHeaderDb
 
 withBlockHeaderDbsResource
     :: RocksDb
@@ -328,7 +330,7 @@ withInMemSQLiteResource = withSQLiteResource ":memory:"
 -- All toy values are based on `toyVersion`. Don't use these values with another
 -- chainweb version!
 
-toyVersion :: ChainwebVersion
+toyVersion :: ChainwebVersion dc
 toyVersion = Test singletonChainGraph
 
 toyChainId :: ChainId
@@ -342,7 +344,7 @@ toyGenesis cid = genesisBlockHeader toyVersion cid
 -- Borrowed from TrivialSync.hs
 --
 toyBlockHeaderDb :: RocksDb -> ChainId -> IO (BlockHeader, BlockHeaderDb)
-toyBlockHeaderDb db cid = (g,) <$> testBlockHeaderDb db g
+toyBlockHeaderDb db cid = (g,) <$> testBlockHeaderDb db toyVersion g
   where
     g = toyGenesis cid
 
@@ -368,7 +370,7 @@ genesisBlockHeaderForChain
     -> i
     -> m BlockHeader
 genesisBlockHeaderForChain v i
-    = genesisBlockHeader (_chainwebVersion v) <$> mkChainId v maxBound i
+    = genesisBlockHeader (chainwebVersionTag $ _chainwebVersion v) <$> mkChainId v maxBound i
 
 -- | Populate a `TreeDb` with /n/ generated `BlockHeader`s.
 --
@@ -379,7 +381,7 @@ genesisBlockHeaderForChain v i
 insertN :: Int -> BlockHeader -> BlockHeaderDb -> IO ()
 insertN n g db = traverse_ (unsafeInsertBlockHeaderDb db) bhs
   where
-    bhs = take n $ testBlockHeaders $ ParentHeader g
+    bhs = take n $ testBlockHeaders (_chainwebVersion db) $ ParentHeader g
 
 -- | Payload hashes are generated using 'testBlockPayloadFromParent_', which
 -- includes the nonce. They payloads can be recovered using
@@ -390,7 +392,7 @@ insertN_ s n g db = do
     traverse_ (unsafeInsertBlockHeaderDb db) bhs
     return bhs
   where
-    bhs = take (int n) $ testBlockHeadersWithNonce s $ ParentHeader g
+    bhs = take (int n) $ testBlockHeadersWithNonce (_chainwebVersion db) s $ ParentHeader g
 
 -- | Useful for terminal-based debugging. A @Tree BlockHeader@ can be obtained
 -- from any `TreeDb` via `toTree`.
@@ -431,41 +433,41 @@ data Growth = Randomly | AtMost BlockHeight deriving (Eq, Ord, Show)
 tree :: ChainwebVersion -> Growth -> Gen (Tree BlockHeader)
 tree v g = do
     h <- genesis v
-    Node h <$> forest g h
+    Node h <$> forest v g h
 
 -- | Generate a sane, legal genesis block for 'Test' chainweb instance
 --
 genesis :: ChainwebVersion -> Gen BlockHeader
 genesis v = either (error . sshow) return $ genesisBlockHeaderForChain v (0 :: Int)
 
-forest :: Growth -> BlockHeader -> Gen (Forest BlockHeader)
-forest Randomly h = randomTrunk h
-forest g@(AtMost n) h | n < _blockHeight h = pure []
-                      | otherwise = fixedTrunk g h
+forest :: ChainwebVersion -> Growth -> BlockHeader -> Gen (Forest BlockHeader)
+forest v Randomly h = randomTrunk v h
+forest v g@(AtMost n) h | n < _blockHeight h = pure []
+                      | otherwise = fixedTrunk v g h
 
-fixedTrunk :: Growth -> BlockHeader -> Gen (Forest BlockHeader)
-fixedTrunk g h = frequency [ (1, sequenceA [fork h, trunk g h])
-                           , (5, sequenceA [trunk g h]) ]
+fixedTrunk :: ChainwebVersion -> Growth -> BlockHeader -> Gen (Forest BlockHeader)
+fixedTrunk v g h = frequency [ (1, sequenceA [fork v h, trunk v g h])
+                             , (5, sequenceA [trunk v g h]) ]
 
-randomTrunk :: BlockHeader -> Gen (Forest BlockHeader)
-randomTrunk h = frequency [ (2, pure [])
-                          , (4, sequenceA [fork h, trunk Randomly h])
-                          , (18, sequenceA [trunk Randomly h]) ]
+randomTrunk :: ChainwebVersion -> BlockHeader -> Gen (Forest BlockHeader)
+randomTrunk v h = frequency [ (2, pure [])
+                            , (4, sequenceA [fork v h, trunk v Randomly h])
+                            , (18, sequenceA [trunk v Randomly h]) ]
 
-fork :: BlockHeader -> Gen (Tree BlockHeader)
-fork h = do
-    next <- header h
-    Node next <$> frequency [ (1, pure []), (1, sequenceA [fork next]) ]
+fork :: ChainwebVersion -> BlockHeader -> Gen (Tree BlockHeader)
+fork v h = do
+    next <- header v h
+    Node next <$> frequency [ (1, pure []), (1, sequenceA [fork v next]) ]
 
-trunk :: Growth -> BlockHeader -> Gen (Tree BlockHeader)
-trunk g h = do
-    next <- header h
-    Node next <$> forest g next
+trunk :: ChainwebVersion -> Growth -> BlockHeader -> Gen (Tree BlockHeader)
+trunk v g h = do
+    next <- header v h
+    Node next <$> forest v g next
 
 -- | Generate some new `BlockHeader` based on a parent.
 --
-header :: BlockHeader -> Gen BlockHeader
-header p = do
+header :: ChainwebVersion -> BlockHeader -> Gen BlockHeader
+header v p = do
     nonce <- Nonce <$> chooseAny
     return
         . fromLog @ChainwebMerkleHashAlgorithm
@@ -478,14 +480,13 @@ header p = do
             :+: _chainId p
             :+: BlockWeight (targetToDifficulty target) + _blockWeight p
             :+: succ (_blockHeight p)
-            :+: v
+            :+: (chainwebVersionTag v)
             :+: epochStart (ParentHeader p) mempty t'
             :+: nonce
             :+: MerkleLogBody mempty
    where
     BlockCreationTime t = _blockCreationTime p
-    target = powTarget (ParentHeader p) mempty t'
-    v = _blockChainwebVersion p
+    target = powTarget v (ParentHeader p) mempty t'
     t' = BlockCreationTime (scaleTimeSpan (10 :: Int) second `add` t)
 
 -- | get arbitrary value for seed.
@@ -506,7 +507,7 @@ testBlockHeaderDbs :: RocksDb -> ChainwebVersion -> IO [(ChainId, BlockHeaderDb)
 testBlockHeaderDbs rdb v = mapM toEntry $ toList $ chainIds v
   where
     toEntry c = do
-        d <- testBlockHeaderDb rdb (genesisBlockHeader v c)
+        d <- testBlockHeaderDb rdb v (genesisBlockHeader (chainwebVersionTag v) c)
         return (c, d)
 
 petersonGenesisBlockHeaderDbs
@@ -528,7 +529,7 @@ linearBlockHeaderDbs n genDbs = do
   where
     populateDb (_, db) = do
         gbh0 <- root db
-        traverse_ (unsafeInsertBlockHeaderDb db) . take (int n) . testBlockHeaders $ ParentHeader gbh0
+        traverse_ (unsafeInsertBlockHeaderDb db) . take (int n) . testBlockHeaders (_chainwebVersion db) $ ParentHeader gbh0
 
 starBlockHeaderDbs
     :: Natural
@@ -541,9 +542,9 @@ starBlockHeaderDbs n genDbs = do
   where
     populateDb (_, db) = do
         gbh0 <- root db
+        let newEntry i h = head $ testBlockHeadersWithNonce (_chainwebVersion db) (Nonce i) h
         traverse_ (\i -> unsafeInsertBlockHeaderDb db . newEntry i $ ParentHeader gbh0) [0 .. (int n-1)]
 
-    newEntry i h = head $ testBlockHeadersWithNonce (Nonce i) h
 
 -- -------------------------------------------------------------------------- --
 -- Toy Server Interaction
@@ -585,13 +586,13 @@ data TestClientEnv t tbl = TestClientEnv
     , _envMempools :: ![(ChainId, MempoolBackend t)]
     , _envPayloadDbs :: ![(ChainId, PayloadDb tbl)]
     , _envPeerDbs :: ![(NetworkId, P2P.PeerDb)]
-    , _envVersion :: !ChainwebVersion
+    , _envVersion :: !ChainwebVersionTag
     }
 
 pattern BlockHeaderDbsTestClientEnv
     :: ClientEnv
     -> [(ChainId, BlockHeaderDb)]
-    -> ChainwebVersion
+    -> ChainwebVersionTag
     -> TestClientEnv t tbl
 pattern BlockHeaderDbsTestClientEnv { _cdbEnvClientEnv, _cdbEnvBlockHeaderDbs, _cdbEnvVersion }
     = TestClientEnv _cdbEnvClientEnv Nothing _cdbEnvBlockHeaderDbs [] [] [] _cdbEnvVersion
@@ -599,7 +600,7 @@ pattern BlockHeaderDbsTestClientEnv { _cdbEnvClientEnv, _cdbEnvBlockHeaderDbs, _
 pattern PeerDbsTestClientEnv
     :: ClientEnv
     -> [(NetworkId, P2P.PeerDb)]
-    -> ChainwebVersion
+    -> ChainwebVersionTag
     -> TestClientEnv t tbl
 pattern PeerDbsTestClientEnv { _pdbEnvClientEnv, _pdbEnvPeerDbs, _pdbEnvVersion }
     = TestClientEnv _pdbEnvClientEnv Nothing [] [] [] _pdbEnvPeerDbs _pdbEnvVersion
@@ -608,14 +609,14 @@ pattern PayloadTestClientEnv
     :: ClientEnv
     -> CutDb tbl
     -> [(ChainId, PayloadDb tbl)]
-    -> ChainwebVersion
+    -> ChainwebVersionTag
     -> TestClientEnv t tbl
 pattern PayloadTestClientEnv { _pEnvClientEnv, _pEnvCutDb, _pEnvPayloadDbs, _eEnvVersion }
     = TestClientEnv _pEnvClientEnv (Just _pEnvCutDb) [] [] _pEnvPayloadDbs [] _eEnvVersion
 
 withTestAppServer
     :: Bool
-    -> ChainwebVersion
+    -> ChainwebVersionTag
     -> IO W.Application
     -> (Int -> IO a)
     -> (a -> IO b)
@@ -653,7 +654,7 @@ withTestAppServer tls v appIO envIO userFunc = bracket start stop go
 --
 withChainwebTestServer
     :: Bool
-    -> ChainwebVersion
+    -> ChainwebVersionTag
     -> IO W.Application
     -> (Int -> IO a)
     -> (IO a -> TestTree)
@@ -697,7 +698,7 @@ clientEnvWithChainwebTestServer
     -> (IO (TestClientEnv t tbl) -> TestTree)
     -> TestTree
 clientEnvWithChainwebTestServer tls v dbsIO =
-    withChainwebTestServer tls v mkApp mkEnv
+    withChainwebTestServer tls (chainwebVersionTag v) mkApp mkEnv
   where
     mkApp :: IO W.Application
     mkApp = chainwebApplication (defaultChainwebConfiguration v) <$> dbsIO
@@ -716,7 +717,7 @@ clientEnvWithChainwebTestServer tls v dbsIO =
             (_chainwebServerMempools dbs)
             (_chainwebServerPayloadDbs dbs)
             (_chainwebServerPeerDbs dbs)
-            v
+            (chainwebVersionTag v)
 
 withPeerDbsServer
     :: Show t
@@ -1118,7 +1119,7 @@ bootstrapConfig conf = conf
     & set (configP2p . p2pConfigPeer) peerConfig
     & set (configP2p . p2pConfigKnownPeers) []
   where
-    peerConfig = head (bootstrapPeerConfig $ _configChainwebVersion conf)
+    peerConfig = head (bootstrapPeerConfig $ chainwebVersionTag $ _configChainwebVersion conf)
         & set peerConfigPort 0
         & set peerConfigHost host
 

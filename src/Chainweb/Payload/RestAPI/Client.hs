@@ -47,7 +47,7 @@ payloadClient_
 payloadClient_ = client (payloadGetApi @v @c)
 
 payloadClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> BlockPayloadHash
     -> ClientM PayloadData
@@ -71,7 +71,7 @@ payloadBatchClient_ = client (payloadPostApi @v @c)
 -- data. Results are returned in any order.
 --
 payloadBatchClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> [BlockPayloadHash]
     -> ClientM [PayloadData]
@@ -92,7 +92,7 @@ outputsClient_
 outputsClient_ = client (outputsGetApi @v @c)
 
 outputsClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> BlockPayloadHash
     -> ClientM PayloadWithOutputs
@@ -113,7 +113,7 @@ outputsBatchClient_
 outputsBatchClient_ = client (outputsPostApi @v @c)
 
 outputsBatchClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> ChainId
     -> [BlockPayloadHash]
     -> ClientM [PayloadWithOutputs]

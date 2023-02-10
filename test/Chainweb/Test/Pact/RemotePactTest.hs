@@ -99,7 +99,7 @@ import Chainweb.Storage.Table.RocksDB
 nNodes :: Natural
 nNodes = 1
 
-v :: ChainwebVersion
+v :: ChainwebVersion dc
 v = FastTimedCPM petersonChainGraph
 
 cid :: HasCallStack => ChainId

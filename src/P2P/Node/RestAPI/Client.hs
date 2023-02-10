@@ -35,7 +35,7 @@ import P2P.Peer
 -- GET Peer Client
 
 peerGetClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> NetworkId
     -> Maybe Limit
     -> Maybe (NextItem Int)
@@ -50,7 +50,7 @@ peerGetClient (FromSingChainwebVersion (SChainwebVersion :: Sing v)) = f
 -- PUT Peer Client
 
 peerPutClient
-    :: ChainwebVersion
+    :: ChainwebVersionName
     -> NetworkId
     -> PeerInfo
     -> ClientM NoContent

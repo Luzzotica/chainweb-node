@@ -73,7 +73,7 @@ import Chainweb.Version.Utils
 
 import Chainweb.Storage.Table.RocksDB
 
-testVersion :: ChainwebVersion
+testVersion :: ChainwebVersion dc
 testVersion = FastTimedCPM peterson
 
 cid :: ChainId
@@ -297,6 +297,7 @@ blockGasLimitTest _ reqIO = testCase "blockGasLimitTest" $ do
             (PactResult $ Right $ pString "output") 0 Nothing Nothing Nothing [])
         payload = toPayloadWithOutputs noMiner block
         bh = newBlockHeader
+          testVersion
           mempty
           (_payloadWithOutputsPayloadHash payload)
           (Nonce 0)

@@ -74,7 +74,7 @@ newTestServer = mask_ $ do
                 putMVar envMv env
                 atomically retry
 
-    version :: ChainwebVersion
+    version :: ChainwebVersion dc
     version = Test singletonChainGraph
 
     host :: String

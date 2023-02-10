@@ -54,7 +54,6 @@ import Test.QuickCheck.Gen (Gen)
 
 import Chainweb.BlockCreationTime
 import Chainweb.BlockHeader
-import Chainweb.BlockHeader.Genesis
 import Chainweb.BlockHeight
 import Chainweb.ChainValue
 import Chainweb.Test.Orphans.Internal
@@ -80,6 +79,7 @@ instance HasChainId TestHeader where
     {-# INLINE _chainId #-}
 
 instance HasChainwebVersion TestHeader where
+    type DevConfig TestHeader = ()
     _chainwebVersion = _chainwebVersion . _testHeaderHdr
     {-# INLINE _chainwebVersion #-}
 
@@ -163,7 +163,7 @@ arbitraryTestHeaderHeight v cid h = do
             <$> HM.insert cid (_parentHeader parent) as
     t <- BlockCreationTime <$> chooseEnum (pt, maxBound)
     return $ TestHeader
-        { _testHeaderHdr = newBlockHeader (ParentHeader <$> as) payloadHash nonce t parent
+        { _testHeaderHdr = newBlockHeader v (ParentHeader <$> as) payloadHash nonce t parent
         , _testHeaderParent = parent
         , _testHeaderAdjs = toList $ ParentHeader <$> as
         }
@@ -198,11 +198,11 @@ genesisTestHeader
 genesisTestHeader v cid = TestHeader
     { _testHeaderHdr = gen
     , _testHeaderParent = ParentHeader gen
-    , _testHeaderAdjs = ParentHeader . genesisBlockHeader (_chainwebVersion v)
+    , _testHeaderAdjs = ParentHeader . genesisBlockHeader (chainwebVersionTag $ _chainwebVersion v)
         <$> toList (adjacentChainIds (_chainGraph gen) cid)
     }
   where
-    gen = genesisBlockHeader (_chainwebVersion v) (_chainId cid)
+    gen = genesisBlockHeader (chainwebVersionTag $ _chainwebVersion v) (_chainId cid)
 
 -- -------------------------------------------------------------------------- --
 -- Query TestHeader from a network
@@ -217,9 +217,9 @@ queryTestHeader
     -> IO TestHeader
 queryTestHeader v c h = do
     mgr <- mkMgr
-    hdr <- getHeaderByHash mgr ver cid h
-    parent <- getHeaderByHash mgr ver cid $ _blockParent hdr
-    ads <- itraverse (\ac a -> ParentHeader <$> getHeaderByHash mgr ver ac a)
+    hdr <- getHeaderByHash mgr (chainwebVersionTag ver) cid h
+    parent <- getHeaderByHash mgr (chainwebVersionTag ver) cid $ _blockParent hdr
+    ads <- itraverse (\ac a -> ParentHeader <$> getHeaderByHash mgr (chainwebVersionTag ver) ac a)
         $ _getBlockHashRecord
         $ _blockAdjacentHashes hdr
     return $ TestHeader
@@ -241,9 +241,9 @@ queryTestHeaderByHeight
     -> IO TestHeader
 queryTestHeaderByHeight v c h = do
     mgr <- mkMgr
-    hdr <- getHeaderByHeight mgr ver cid h
-    parent <- getHeaderByHash mgr ver cid $ _blockParent hdr
-    ads <- itraverse (\ac a -> ParentHeader <$> getHeaderByHash mgr ver ac a)
+    hdr <- getHeaderByHeight mgr (chainwebVersionTag ver) cid h
+    parent <- getHeaderByHash mgr (chainwebVersionTag ver) cid $ _blockParent hdr
+    ads <- itraverse (\ac a -> ParentHeader <$> getHeaderByHash mgr (chainwebVersionTag ver) ac a)
         $ _getBlockHashRecord
         $ _blockAdjacentHashes hdr
     return $ TestHeader

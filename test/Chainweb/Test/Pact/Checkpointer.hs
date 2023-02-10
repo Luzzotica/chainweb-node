@@ -548,7 +548,7 @@ runRegression pactdb e schemaInit = do
 -- -------------------------------------------------------------------------- --
 -- Chainweb Settings
 
-testVer :: ChainwebVersion
+testVer :: ChainwebVersion dc
 testVer = FastTimedCPM peterson
 
 testChainId :: ChainId

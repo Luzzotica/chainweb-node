@@ -136,7 +136,7 @@ p2pServer (PeerDbT db) = case sing @_ @n of
         -> peerGetHandler db (MempoolNetwork $ FromSing cid)
         :<|> peerPutHandler db v (MempoolNetwork $ FromSing cid)
   where
-    v = FromSing (SChainwebVersion :: Sing v)
+    v = _chainwebVersion db
 
 -- -------------------------------------------------------------------------- --
 -- Application for a single P2P Network
@@ -172,7 +172,7 @@ someP2pServer (SomePeerDb (db :: PeerDbT v n)) = case sing @_ @n of
     SChainNetwork SChainId -> SomeServer (Proxy @(P2pApi v n)) (p2pServer db)
     SMempoolNetwork SChainId -> SomeServer (Proxy @(P2pApi v n)) (p2pServer db)
 
-someP2pServers :: ChainwebVersion -> [(NetworkId, PeerDb)] -> SomeServer
+someP2pServers :: ChainwebVersionName -> [(NetworkId, PeerDb)] -> SomeServer
 someP2pServers v = mconcat
     . fmap (someP2pServer . uncurry (somePeerDbVal v))
 
@@ -181,7 +181,7 @@ someP2pServers v = mconcat
 
 serveP2pOnPort
     :: Port
-    -> ChainwebVersion
+    -> ChainwebVersionName
     -> [(NetworkId, PeerDb)]
     -> IO ()
 serveP2pOnPort p v = run (int p) . someServerApplication . someP2pServers v
@@ -189,7 +189,7 @@ serveP2pOnPort p v = run (int p) . someServerApplication . someP2pServers v
 serveP2pSocket
     :: Settings
     -> Socket
-    -> ChainwebVersion
+    -> ChainwebVersionName
     -> [(NetworkId, PeerDb)]
     -> IO ()
 serveP2pSocket s sock v = runSettingsSocket s sock . someServerApplication . someP2pServers v
